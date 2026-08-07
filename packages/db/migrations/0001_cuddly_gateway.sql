@@ -1,0 +1,2 @@
+ALTER POLICY "tenant_isolation_policy" ON "properties" TO public USING ("properties"."account_id"::text = current_setting('app.current_tenant_id', true));--> statement-breakpoint
+ALTER POLICY "tenant_isolation_policy" ON "units" TO public USING ("units"."account_id"::text = current_setting('app.current_tenant_id', true));
