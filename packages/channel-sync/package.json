@@ -11,12 +11,18 @@
   "scripts": {
     "lint": "eslint . --ext .ts",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "dotenv -e ../../.env -- vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@repo/shared-types": "workspace:*"
+    "@repo/db": "workspace:*",
+    "@repo/shared-types": "workspace:*",
+    "drizzle-orm": "^0.38.2",
+    "ical-generator": "^7.2.0",
+    "node-ical": "^0.19.0"
   },
   "devDependencies": {
+    "@types/node": "^22.10.2",
+    "dotenv-cli": "^8.0.0",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
   }

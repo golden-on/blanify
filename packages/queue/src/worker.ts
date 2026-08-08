@@ -1,14 +1,4 @@
-import { Worker } from "bullmq";
-import { connection } from "./connection";
+import "./workers/ical-sync";
+import "./workers/ota-webhook";
 
-const worker = new Worker(
-  "default",
-  async () => {
-    // Placeholder job processor — implemented per feature spec.
-  },
-  { connection },
-);
-
-worker.on("ready", () => {
-  console.log("Queue worker ready");
-});
+console.log("Queue worker process started");

@@ -3,3 +3,7 @@ export * from "./properties";
 export * from "./units";
 export * from "./reservations";
 export * from "./nightly-availability";
+export * from "./unit-ical-feeds";
+export * from "./channel-connections";
+export * from "./channel-unit-mappings";
+export * from "./webhook-events";

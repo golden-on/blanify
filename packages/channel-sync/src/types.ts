@@ -1,5 +1,11 @@
+export interface ExternalBooking {
+  externalReservationId: string;
+  checkIn: string;
+  checkOut: string;
+}
+
 export interface ChannelDriver {
-  syncAvailability(unitId: string): Promise<void>;
-  syncRates(unitId: string): Promise<void>;
-  fetchBookings(unitId: string): Promise<unknown[]>;
+  syncAvailability(accountId: string, unitId: string): Promise<void>;
+  syncRates(accountId: string, unitId: string): Promise<void>;
+  fetchBookings(accountId: string, unitId: string): Promise<ExternalBooking[]>;
 }

@@ -20,6 +20,12 @@ export function nightsBetween(checkIn: string, checkOut: string): string[] {
   return dates;
 }
 
+export function addDays(date: string, days: number): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 export async function ensureNightlyAvailability(
   accountId: string,
   unitId: string,
@@ -139,9 +145,11 @@ export async function blockDates(input: BlockDatesInput): Promise<void> {
   await withTenant(input.accountId, async (tx) => {
     const lockedRows = await lockNightlyAvailabilityRows(tx, input.unitId, input.dates);
 
+    // Re-blocking an already-blocked night is a no-op (feeds re-sync every 5-15 minutes),
+    // only an existing 'booked' night is a genuine conflict.
     if (
       lockedRows.length !== input.dates.length ||
-      lockedRows.some((row) => row.status !== "available")
+      lockedRows.some((row) => row.status === "booked")
     ) {
       throw new ConcurrencyError("One or more requested nights are not available to block");
     }

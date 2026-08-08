@@ -22,6 +22,20 @@
       "when": 1786121663894,
       "tag": "0002_robust_wrecking_crew",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786135504704,
+      "tag": "0003_tan_retro_girl",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786149678663,
+      "tag": "0004_clammy_morg",
+      "breakpoints": true
     }
   ]
 }

@@ -4,18 +4,25 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
+    "dev": "dotenv -e ../../.env -- tsx watch src/server.ts",
     "build": "tsup",
     "start": "node dist/server.js",
     "lint": "eslint . --ext .ts",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "dotenv -e ../../.env -- vitest run --passWithNoTests"
   },
   "dependencies": {
-    "fastify": "^5.2.0"
+    "@repo/channel-sync": "workspace:*",
+    "@repo/db": "workspace:*",
+    "@repo/queue": "workspace:*",
+    "@repo/shared-types": "workspace:*",
+    "drizzle-orm": "^0.38.2",
+    "fastify": "^5.2.0",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
+    "dotenv-cli": "^8.0.0",
     "tsup": "^8.3.5",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",

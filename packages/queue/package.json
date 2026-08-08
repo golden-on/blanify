@@ -9,17 +9,20 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "dev": "tsx watch src/worker.ts",
+    "dev": "dotenv -e ../../.env -- tsx watch src/worker.ts",
     "lint": "eslint . --ext .ts",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "dotenv -e ../../.env -- vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@repo/channel-sync": "workspace:*",
+    "@repo/shared-types": "workspace:*",
     "bullmq": "^5.34.0",
     "ioredis": "^5.4.1"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
+    "dotenv-cli": "^8.0.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
