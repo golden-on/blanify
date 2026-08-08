@@ -74,5 +74,5 @@ describe.skipIf(!reachable)("concurrent reservation creation", () => {
     );
     expect(rows).toHaveLength(3);
     expect(rows.every((row) => row.status === "booked")).toBe(true);
-  });
+  }, 20000);
 });

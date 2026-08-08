@@ -1,5 +1,6 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import { registerWebhookRoutes } from "./routes/webhooks";
+import { registerPublicRoutes } from "./routes/public";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -26,6 +27,7 @@ export function buildApp(): FastifyInstance {
   });
 
   app.register(registerWebhookRoutes);
+  app.register(registerPublicRoutes);
 
   return app;
 }
