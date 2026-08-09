@@ -50,6 +50,13 @@
       "when": 1786230370633,
       "tag": "0006_powerful_hydra",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786238145343,
+      "tag": "0007_curved_triathlon",
+      "breakpoints": true
     }
   ]
 }

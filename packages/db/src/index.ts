@@ -6,3 +6,5 @@ export * from "./webhook-events";
 export * from "./websites";
 export * from "./payments";
 export * from "./stripe-accounts";
+export * from "./inbox";
+export * from "./automation";

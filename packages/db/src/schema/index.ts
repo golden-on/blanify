@@ -11,3 +11,7 @@ export * from "./hosted-websites";
 export * from "./website-pages";
 export * from "./stripe-accounts";
 export * from "./payments";
+export * from "./threads";
+export * from "./messages";
+export * from "./automation-rules";
+export * from "./automation-dispatches";

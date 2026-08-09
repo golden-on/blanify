@@ -1,8 +1,11 @@
 import Fastify, { type FastifyInstance } from "fastify";
+import websocketPlugin from "@fastify/websocket";
 import { registerWebhookRoutes } from "./routes/webhooks";
 import { registerPublicRoutes } from "./routes/public";
 import { registerCheckoutRoutes } from "./routes/checkout";
 import { registerStripeWebhookRoutes } from "./routes/stripe-webhook";
+import { registerInboxRoutes } from "./routes/inbox";
+import { registerInboxWsRoutes } from "./routes/inbox-ws";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -28,10 +31,13 @@ export function buildApp(): FastifyInstance {
     return { status: "ok" };
   });
 
+  app.register(websocketPlugin);
   app.register(registerWebhookRoutes);
   app.register(registerPublicRoutes);
   app.register(registerCheckoutRoutes);
   app.register(registerStripeWebhookRoutes);
+  app.register(registerInboxRoutes);
+  app.register(registerInboxWsRoutes);
 
   return app;
 }
