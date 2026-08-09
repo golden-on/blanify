@@ -43,6 +43,13 @@
       "when": 1786226115542,
       "tag": "0005_kind_black_cat",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786230370633,
+      "tag": "0006_powerful_hydra",
+      "breakpoints": true
     }
   ]
 }

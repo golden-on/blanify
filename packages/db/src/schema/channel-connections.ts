@@ -2,7 +2,7 @@ import { sql } from "drizzle-orm";
 import { pgEnum, pgPolicy, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { accounts } from "./accounts";
 
-export const channelType = pgEnum("channel_type", ["airbnb", "booking", "vrbo"]);
+export const channelType = pgEnum("channel_type", ["airbnb", "booking", "vrbo", "stripe"]);
 
 export const channelConnectionStatus = pgEnum("channel_connection_status", [
   "active",

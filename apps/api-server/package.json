@@ -18,6 +18,7 @@
     "@repo/shared-types": "workspace:*",
     "drizzle-orm": "^0.38.2",
     "fastify": "^5.2.0",
+    "stripe": "^17.5.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {
