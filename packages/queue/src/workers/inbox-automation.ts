@@ -1,6 +1,6 @@
 import { Worker, QueueEvents } from "bullmq";
 import { inboxAutomationJobSchema, inboxChannelForAccount } from "@repo/shared-types";
-import { evaluateAutomationRules } from "@repo/db";
+import { createCheckoutCleaningTasks, evaluateAutomationRules } from "@repo/db";
 import { connection } from "../connection";
 import {
   INBOX_AUTOMATION_QUEUE,
@@ -21,7 +21,13 @@ export const inboxAutomationWorker = new Worker(
       await connection.publish(inboxChannelForAccount(accountId), JSON.stringify({ threadId, message }));
     }
 
-    return { dispatched: dispatches.length };
+    // Housekeeping tasks aren't guest messages, so they don't go through
+    // automation_rules/automation_dispatches — see packages/db/src/housekeeping.ts.
+    // Sharing this hourly tick (rather than a separate queue) matches CLAUDE.md's
+    // Phase 9 wording ("inside the hourly automation worker").
+    const cleaningTasksCreated = await createCheckoutCleaningTasks();
+
+    return { dispatched: dispatches.length, cleaningTasksCreated };
   },
   { connection },
 );

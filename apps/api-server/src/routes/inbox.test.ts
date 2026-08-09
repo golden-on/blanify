@@ -24,8 +24,8 @@ describe.skipIf(!reachable)("Inbox REST routes", () => {
     account = (await db.insert(accounts).values({ name: "Inbox Route Test Tenant" }).returning())[0]!;
     otherAccount = (await db.insert(accounts).values({ name: "Inbox Route Test Tenant B" }).returning())[0]!;
 
-    token = signToken({ sub: crypto.randomUUID(), accountId: account.id, email: "host@example.com" });
-    otherToken = signToken({ sub: crypto.randomUUID(), accountId: otherAccount.id, email: "other@example.com" });
+    token = signToken({ sub: crypto.randomUUID(), accountId: account.id, email: "host@example.com", role: "owner" });
+    otherToken = signToken({ sub: crypto.randomUUID(), accountId: otherAccount.id, email: "other@example.com", role: "owner" });
 
     property = await withTenant(account.id, async (tx) => {
       const [row] = await tx.insert(properties).values({ accountId: account.id, name: "Property" }).returning();

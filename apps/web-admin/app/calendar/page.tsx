@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { useSession } from "@/lib/session";
 import { apiFetch, ApiError } from "@/lib/api";
+import { OnboardingWizard } from "@/components/OnboardingWizard";
 
 interface Unit {
   id: string;
@@ -174,7 +175,7 @@ export default function CalendarPage() {
       )}
 
       {units.length === 0 ? (
-        <p className="text-sm text-neutral-500">No units yet. Add a unit to see it here.</p>
+        token && <OnboardingWizard token={token} onComplete={() => void loadCalendar()} />
       ) : (
         <div className="overflow-x-auto">
           <table className="border-collapse text-sm">

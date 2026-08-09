@@ -204,6 +204,55 @@ COMMIT;
   * **Real-Time Inbox UI:** Integrated chat panel connected via WebSockets (`/api/v1/inbox/ws`) with a 1-click "Suggest AI Reply" button powered by the Anthropic LLM driver.
   * **Channel & Operational Settings:** Management views for Stripe Connect setup, PriceLabs API keys, Seam lock statuses, and dynamic site layout JSON edits.
 
+
+
+  ### Phase 9: Host Onboarding, Operations & Task Management
+
+* **Host Onboarding & Unit Creation (P0 Requirement):**
+  * `POST /api/v1/host/properties` and `POST /api/v1/host/units` host endpoints.
+  * Guided onboarding wizard in `apps/web-admin` triggered when an account has zero units.
+
+* **Role-Based Access Control (RBAC):**
+  * Add `role` enum (`owner`, `manager`, `cleaner`, `maintenance`) to `users` schema.
+  * Update `requireAuth` preHandler to enforce role-based route access (e.g., restricting cleaners to assigned tasks).
+
+* **Housekeeping & Maintenance Task Engine:**
+  * Schema: `staff_members` and `housekeeping_tasks` tables with RLS (`tenant_isolation_policy`).
+  * Automated task dispatch: Automatically trigger a cleaning task upon reservation checkout (`checkout_plus_0_days`) inside the hourly automation worker.
+  * Host Task Management UI in `apps/web-admin` (`GET/POST/PATCH /api/v1/host/tasks`).
+
+* **Owner Management & Payout Statements:**
+  * Schema: `owners`, `unit_owners` (with `split_pct`), and `payout_statements` tables with RLS.
+  * Recurring queue worker: Monthly job aggregating `payments` per unit split to generate `payout_statements` rows.
+
+---
+
+### Phase 10: Advanced Marketing, Channels & Guest Experience
+
+* **Coupons, Promo Codes & LOS Discount Engine:**
+  * `discounts` schema (`code`, `discount_type`, `value`, `min_stay_nights`, `valid_from`, `valid_to`).
+  * Extend `/api/v1/public/checkout/create-session` to evaluate promo codes and Length-of-Stay rules before creating Stripe sessions.
+
+* **Checkout Add-On Fee Marketplace:**
+  * `unit_add_ons` schema (`unit_id`, `name`, `price_in_cents`, `fee_type`, `is_required`).
+  * Support optional line-item upsells (early check-in, pet fees) inside `<vacation-booking-widget>` and Stripe Checkout.
+
+* **Guest Self-Service Portal & Digital Guidebook:**
+  * Token-based guest route (`/guest/:reservationToken`).
+  * Self-service check-in, digital signature rental agreement, house manual, and Seam access code display.
+
+* **Google Vacation Rentals Driver & Content Sync:**
+  * Implement Google Vacation Rentals feed driver in `packages/channel-sync`.
+  * Outbound photo and listing metadata push pipeline.
+
+---
+
+### Phase 11: Enterprise Financials, Tax & Analytics (Planned)
+* Localized Tax Jurisdiction Engine (VAT / tourist occupancy tax rules at checkout).
+* Automated Guest Invoicing (PDF generation queue worker).
+* Security Deposit Claims Workflow (exercising the Phase 6 `capture_method: 'manual'` pre-auth hold).
+* Real-Time RevPAR / ADR / Occupancy performance analytics dashboard.
+
 ---
 
 ## Coding Conventions & Guidelines

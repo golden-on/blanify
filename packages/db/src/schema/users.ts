@@ -1,5 +1,9 @@
-import { pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { pgEnum, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import { accounts } from "./accounts";
+
+// Shared by users.role and staff_members.role — a staff login's users.role and
+// their staff_members.role are expected to match (see housekeeping.ts).
+export const userRole = pgEnum("user_role", ["owner", "manager", "cleaner", "maintenance"]);
 
 // Intentionally NOT RLS-protected: login only has an email and password — no
 // accountId yet, since resolving *which* tenant is the entire point of logging in.
@@ -16,6 +20,7 @@ export const users = pgTable(
       .references(() => accounts.id),
     email: text("email").notNull(),
     passwordHash: text("password_hash").notNull(),
+    role: userRole("role").notNull().default("owner"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [unique("users_email_unique").on(table.email)],

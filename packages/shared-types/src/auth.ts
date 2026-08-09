@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { idSchema } from "./base";
 
+export const userRoleSchema = z.enum(["owner", "manager", "cleaner", "maintenance"]);
+export type UserRole = z.infer<typeof userRoleSchema>;
+
 export const registerRequestSchema = z.object({
   accountName: z.string().min(1),
   email: z.string().email(),
@@ -18,6 +21,7 @@ export const authTokenPayloadSchema = z.object({
   sub: idSchema,
   accountId: idSchema,
   email: z.string().email(),
+  role: userRoleSchema,
 });
 
 export type RegisterRequest = z.infer<typeof registerRequestSchema>;

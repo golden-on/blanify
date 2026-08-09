@@ -19,3 +19,8 @@ export * from "./smart-locks";
 export * from "./access-codes";
 export * from "./pricing-integrations";
 export * from "./users";
+export * from "./staff-members";
+export * from "./housekeeping-tasks";
+export * from "./owners";
+export * from "./unit-owners";
+export * from "./payout-statements";

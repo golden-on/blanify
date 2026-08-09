@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken";
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { authTokenPayloadSchema, type AuthTokenPayload } from "@repo/shared-types";
+import { authTokenPayloadSchema, type AuthTokenPayload, type UserRole } from "@repo/shared-types";
 
 const JWT_SECRET = process.env.AUTH_JWT_SECRET ?? "dev-auth-secret-not-for-production";
 
@@ -31,7 +31,19 @@ export async function requireAuth(request: FastifyRequest, reply: FastifyReply) 
     const payload = authTokenPayloadSchema.parse(decoded);
     request.accountId = payload.accountId;
     request.userId = payload.sub;
+    request.userEmail = payload.email;
+    request.userRole = payload.role;
   } catch {
     return reply.code(401).send({ error: { code: "UNAUTHORIZED", message: "Invalid or expired token" } });
   }
+}
+
+// Composes after requireAuth in a route's preHandler array — requireAuth must run
+// first to populate request.userRole, or this always 403s.
+export function requireRole(...roles: UserRole[]) {
+  return async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!request.userRole || !roles.includes(request.userRole)) {
+      return reply.code(403).send({ error: { code: "FORBIDDEN", message: "Your role does not permit this action" } });
+    }
+  };
 }

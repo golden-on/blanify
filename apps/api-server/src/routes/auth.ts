@@ -24,8 +24,8 @@ export async function registerAuthRoutes(app: FastifyInstance) {
     const passwordHash = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
     const { account, user } = await createAccountWithOwner({ accountName, email, passwordHash });
 
-    const token = signToken({ sub: user.id, accountId: account.id, email: user.email });
-    return reply.code(201).send({ token, accountId: account.id });
+    const token = signToken({ sub: user.id, accountId: account.id, email: user.email, role: user.role });
+    return reply.code(201).send({ token, accountId: account.id, role: user.role });
   });
 
   app.post("/api/v1/auth/login", async (request, reply) => {
@@ -41,7 +41,7 @@ export async function registerAuthRoutes(app: FastifyInstance) {
       return reply.code(401).send({ error: { code: "INVALID_CREDENTIALS", message: "Incorrect email or password" } });
     }
 
-    const token = signToken({ sub: user.id, accountId: user.accountId, email: user.email });
-    return reply.code(200).send({ token, accountId: user.accountId });
+    const token = signToken({ sub: user.id, accountId: user.accountId, email: user.email, role: user.role });
+    return reply.code(200).send({ token, accountId: user.accountId, role: user.role });
   });
 }

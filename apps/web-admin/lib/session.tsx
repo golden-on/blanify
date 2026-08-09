@@ -3,10 +3,13 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { apiFetch } from "./api";
 
+export type UserRole = "owner" | "manager" | "cleaner" | "maintenance";
+
 export interface Session {
   token: string;
   accountId: string;
   email: string;
+  role: UserRole;
 }
 
 interface SessionContextValue {
@@ -43,19 +46,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }
 
   async function login(email: string, password: string) {
-    const body = await apiFetch<{ token: string; accountId: string }>("/api/v1/auth/login", null, {
+    const body = await apiFetch<{ token: string; accountId: string; role: UserRole }>("/api/v1/auth/login", null, {
       method: "POST",
       body: JSON.stringify({ email, password }),
     });
-    persist({ token: body.token, accountId: body.accountId, email });
+    persist({ token: body.token, accountId: body.accountId, email, role: body.role });
   }
 
   async function register(accountName: string, email: string, password: string) {
-    const body = await apiFetch<{ token: string; accountId: string }>("/api/v1/auth/register", null, {
+    const body = await apiFetch<{ token: string; accountId: string; role: UserRole }>("/api/v1/auth/register", null, {
       method: "POST",
       body: JSON.stringify({ accountName, email, password }),
     });
-    persist({ token: body.token, accountId: body.accountId, email });
+    persist({ token: body.token, accountId: body.accountId, email, role: body.role });
   }
 
   function logout() {

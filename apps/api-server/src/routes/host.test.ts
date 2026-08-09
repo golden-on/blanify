@@ -34,8 +34,8 @@ describe.skipIf(!reachable)("Host routes", () => {
       return row!;
     });
 
-    token = signToken({ sub: crypto.randomUUID(), accountId: account.id, email: "host@example.com" });
-    otherToken = signToken({ sub: crypto.randomUUID(), accountId: otherAccount.id, email: "other@example.com" });
+    token = signToken({ sub: crypto.randomUUID(), accountId: account.id, email: "host@example.com", role: "owner" });
+    otherToken = signToken({ sub: crypto.randomUUID(), accountId: otherAccount.id, email: "other@example.com", role: "owner" });
   });
 
   afterAll(async () => {
@@ -113,6 +113,56 @@ describe.skipIf(!reachable)("Host routes", () => {
       headers: { authorization: `Bearer ${otherToken}` },
     });
     expect(crossTenantCalendar.statusCode).toBe(403);
+
+    await app.close();
+  }, 20000);
+
+  it("creates a property and a unit under withTenant, and rejects a cross-tenant propertyId", async () => {
+    const app = buildApp();
+
+    const propertyResponse = await app.inject({
+      method: "POST",
+      url: "/api/v1/host/properties",
+      headers: { authorization: `Bearer ${token}` },
+      payload: { name: "Onboarding Property" },
+    });
+    expect(propertyResponse.statusCode).toBe(201);
+    const createdPropertyId = propertyResponse.json().property.id as string;
+
+    const unitResponse = await app.inject({
+      method: "POST",
+      url: "/api/v1/host/units",
+      headers: { authorization: `Bearer ${token}` },
+      payload: { propertyId: createdPropertyId, name: "Onboarding Unit" },
+    });
+    expect(unitResponse.statusCode).toBe(201);
+    expect(unitResponse.json().unit).toMatchObject({ propertyId: createdPropertyId, name: "Onboarding Unit" });
+
+    // A different tenant's token must never be able to attach a unit to this
+    // tenant's property.
+    const crossTenantUnit = await app.inject({
+      method: "POST",
+      url: "/api/v1/host/units",
+      headers: { authorization: `Bearer ${otherToken}` },
+      payload: { propertyId: createdPropertyId, name: "Squatted Unit" },
+    });
+    expect(crossTenantUnit.statusCode).toBe(403);
+    expect(crossTenantUnit.json().error.code).toBe("TENANT_ACCESS_DENIED");
+
+    await withTenant(account.id, (tx) => tx.delete(units).where(eq(units.propertyId, createdPropertyId)));
+    await withTenant(account.id, (tx) => tx.delete(properties).where(eq(properties.id, createdPropertyId)));
+
+    await app.close();
+  }, 20000);
+
+  it("blocks a cleaner-role token from every route in this file", async () => {
+    const app = buildApp();
+    const cleanerToken = signToken({ sub: crypto.randomUUID(), accountId: account.id, email: "cleaner@example.com", role: "cleaner" });
+
+    const response = await app.inject({ method: "GET", url: "/api/v1/host/units", headers: { authorization: `Bearer ${cleanerToken}` } });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json().error.code).toBe("FORBIDDEN");
 
     await app.close();
   }, 20000);

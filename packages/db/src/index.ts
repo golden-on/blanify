@@ -12,3 +12,6 @@ export * from "./smart-locks";
 export * from "./pricing";
 export * from "./auth";
 export * from "./host";
+export * from "./properties";
+export * from "./housekeeping";
+export * from "./owners";

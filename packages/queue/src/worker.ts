@@ -4,5 +4,6 @@ import "./workers/stripe-webhook";
 import "./workers/inbox-automation";
 import "./workers/pricing-sync";
 import "./workers/smart-lock-access";
+import "./workers/owner-payout";
 
 console.log("Queue worker process started");

@@ -18,7 +18,7 @@ export async function createAccountWithOwner(input: CreateAccountWithOwnerInput)
 
     const [user] = await tx
       .insert(users)
-      .values({ accountId: account.id, email: input.email, passwordHash: input.passwordHash })
+      .values({ accountId: account.id, email: input.email, passwordHash: input.passwordHash, role: "owner" })
       .returning();
     if (!user) {
       throw new Error("Failed to create user");

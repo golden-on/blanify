@@ -20,7 +20,7 @@ describe.skipIf(!reachable)("WS /api/v1/inbox/ws", () => {
 
   beforeAll(async () => {
     account = (await db.insert(accounts).values({ name: "Inbox WS Test Tenant" }).returning())[0]!;
-    token = signToken({ sub: crypto.randomUUID(), accountId: account.id, email: "host@example.com" });
+    token = signToken({ sub: crypto.randomUUID(), accountId: account.id, email: "host@example.com", role: "owner" });
 
     property = await withTenant(account.id, async (tx) => {
       const [row] = await tx.insert(properties).values({ accountId: account.id, name: "Property" }).returning();

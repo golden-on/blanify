@@ -3,12 +3,14 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { CalendarDays, Inbox, LogOut } from "lucide-react";
-import { useSession } from "@/lib/session";
+import { CalendarDays, ClipboardList, Inbox, LogOut, Users } from "lucide-react";
+import { useSession, type UserRole } from "@/lib/session";
 
-const NAV_ITEMS = [
-  { href: "/calendar", label: "Calendar", icon: CalendarDays },
-  { href: "/inbox", label: "Inbox", icon: Inbox },
+const NAV_ITEMS: { href: string; label: string; icon: typeof CalendarDays; roles?: UserRole[] }[] = [
+  { href: "/calendar", label: "Calendar", icon: CalendarDays, roles: ["owner", "manager"] },
+  { href: "/inbox", label: "Inbox", icon: Inbox, roles: ["owner", "manager"] },
+  { href: "/tasks", label: "Tasks", icon: ClipboardList },
+  { href: "/owners", label: "Owners", icon: Users, roles: ["owner", "manager"] },
 ];
 
 export function NavShell({ children }: { children: React.ReactNode }) {
@@ -36,7 +38,7 @@ export function NavShell({ children }: { children: React.ReactNode }) {
       <aside className="flex w-56 shrink-0 flex-col border-r border-neutral-200 bg-neutral-50 p-4">
         <div className="mb-6 px-2 text-lg font-semibold">Blanify</div>
         <nav className="flex flex-1 flex-col gap-1">
-          {NAV_ITEMS.map(({ href, label, icon: Icon }) => (
+          {NAV_ITEMS.filter((item) => !item.roles || item.roles.includes(session.role)).map(({ href, label, icon: Icon }) => (
             <Link
               key={href}
               href={href}

@@ -9,3 +9,5 @@ export * from "./pricing";
 export * from "./smart-locks";
 export * from "./auth";
 export * from "./host";
+export * from "./housekeeping";
+export * from "./owners";

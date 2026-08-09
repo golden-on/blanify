@@ -1,6 +1,7 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import websocketPlugin from "@fastify/websocket";
 import corsPlugin from "@fastify/cors";
+import type { UserRole } from "@repo/shared-types";
 import { registerWebhookRoutes } from "./routes/webhooks";
 import { registerPublicRoutes } from "./routes/public";
 import { registerCheckoutRoutes } from "./routes/checkout";
@@ -10,12 +11,16 @@ import { registerInboxWsRoutes } from "./routes/inbox-ws";
 import { registerPricingWebhookRoutes } from "./routes/pricing-webhook";
 import { registerAuthRoutes } from "./routes/auth";
 import { registerHostRoutes } from "./routes/host";
+import { registerTaskRoutes } from "./routes/tasks";
+import { registerOwnerRoutes } from "./routes/owners";
 
 declare module "fastify" {
   interface FastifyRequest {
     rawBody?: string;
     accountId?: string;
     userId?: string;
+    userEmail?: string;
+    userRole?: UserRole;
   }
 }
 
@@ -47,6 +52,8 @@ export function buildApp(): FastifyInstance {
   app.register(registerStripeWebhookRoutes);
   app.register(registerAuthRoutes);
   app.register(registerHostRoutes);
+  app.register(registerTaskRoutes);
+  app.register(registerOwnerRoutes);
   app.register(registerInboxRoutes);
   app.register(registerInboxWsRoutes);
   app.register(registerPricingWebhookRoutes);
