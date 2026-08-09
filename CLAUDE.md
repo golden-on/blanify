@@ -190,6 +190,20 @@ COMMIT;
 * **Smart Locks:** Integrate with Seam API (`seam.accessCodes.create`) upon `booking_confirmed` events; dispatch PIN codes via pre-arrival templates.
 * **Dynamic Pricing:** Expose pricing ingestion endpoints for PriceLabs/Beyond to update daily rate overrides in `nightly_availability`.
 
+
+
+### Phase 8: Authentication Engine & Admin Dashboard
+
+* **Auth & Session Middleware (`apps/api-server`):**
+  * Verify incoming JWT session tokens (e.g., via Clerk SDK or custom JWT verification).
+  * Automatically extract `account_id` from token claims and attach it to Fastify requests to enforce `withTenant()` isolation on host routes without requiring manual request parameters.
+
+* **Host Admin Dashboard (`apps/admin` or `apps/web-admin`):**
+  * Next.js App Router workspace configured with Tailwind CSS, Shadcn UI, and Lucide Icons.
+  * **Interactive Multi-Unit Calendar Matrix:** Visual grid displaying unit availability, channel badges (Airbnb, Booking.com, Direct), and manual date-blocking overlays.
+  * **Real-Time Inbox UI:** Integrated chat panel connected via WebSockets (`/api/v1/inbox/ws`) with a 1-click "Suggest AI Reply" button powered by the Anthropic LLM driver.
+  * **Channel & Operational Settings:** Management views for Stripe Connect setup, PriceLabs API keys, Seam lock statuses, and dynamic site layout JSON edits.
+
 ---
 
 ## Coding Conventions & Guidelines

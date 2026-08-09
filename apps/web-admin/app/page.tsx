@@ -1,7 +1,17 @@
+"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useSession } from "@/lib/session";
+
 export default function Home() {
-  return (
-    <main className="flex min-h-screen items-center justify-center">
-      <h1 className="text-2xl font-semibold">Blanify Admin</h1>
-    </main>
-  );
+  const { session, isLoading } = useSession();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (isLoading) return;
+    router.replace(session ? "/calendar" : "/login");
+  }, [isLoading, session, router]);
+
+  return null;
 }

@@ -2,6 +2,7 @@ import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db, withTenant, accounts, properties, units, threads, messages } from "@repo/db";
 import { buildApp } from "../app";
+import { signToken } from "../auth";
 
 let reachable = true;
 try {
@@ -15,9 +16,11 @@ describe.skipIf(!reachable)("WS /api/v1/inbox/ws", () => {
   let property: { id: string };
   let unit: { id: string };
   let thread: { id: string };
+  let token: string;
 
   beforeAll(async () => {
     account = (await db.insert(accounts).values({ name: "Inbox WS Test Tenant" }).returning())[0]!;
+    token = signToken({ sub: crypto.randomUUID(), accountId: account.id, email: "host@example.com" });
 
     property = await withTenant(account.id, async (tx) => {
       const [row] = await tx.insert(properties).values({ accountId: account.id, name: "Property" }).returning();
@@ -51,7 +54,7 @@ describe.skipIf(!reachable)("WS /api/v1/inbox/ws", () => {
     const app = buildApp();
     await app.ready();
 
-    const ws = await app.injectWS(`/api/v1/inbox/ws?accountId=${account.id}`);
+    const ws = await app.injectWS(`/api/v1/inbox/ws?token=${token}`);
 
     const messageReceived = new Promise<string>((resolve) => {
       ws.once("message", (data: Buffer) => resolve(data.toString()));
@@ -63,7 +66,8 @@ describe.skipIf(!reachable)("WS /api/v1/inbox/ws", () => {
     const postResponse = await app.inject({
       method: "POST",
       url: `/api/v1/inbox/threads/${thread.id}/messages`,
-      payload: { accountId: account.id, content: "Hello via WS test" },
+      headers: { authorization: `Bearer ${token}` },
+      payload: { content: "Hello via WS test" },
     });
     expect(postResponse.statusCode).toBe(201);
 
@@ -76,6 +80,15 @@ describe.skipIf(!reachable)("WS /api/v1/inbox/ws", () => {
     expect(parsed.message.content).toBe("Hello via WS test");
 
     ws.close();
+    await app.close();
+  }, 20000);
+
+  it("rejects the handshake when no token is provided", async () => {
+    const app = buildApp();
+    await app.ready();
+
+    await expect(app.injectWS("/api/v1/inbox/ws")).rejects.toBeTruthy();
+
     await app.close();
   }, 20000);
 });

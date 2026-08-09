@@ -1,12 +1,9 @@
 import type { FastifyInstance } from "fastify";
-import {
-  inboxPaginationQuerySchema,
-  sendMessageRequestSchema,
-  suggestReplyRequestSchema,
-} from "@repo/shared-types";
+import { inboxPaginationQuerySchema, sendMessageRequestSchema } from "@repo/shared-types";
 import { createHostMessage, getThreadContext, getThreadMessages, listThreads } from "@repo/db";
 import { llmDriver as defaultLlmDriver, type LLMDriver } from "../ai/llm-client";
 import { publishInboxMessage } from "../realtime";
+import { requireAuth } from "../auth";
 
 export interface InboxRouteDeps {
   llmDriver?: LLMDriver;
@@ -17,38 +14,37 @@ export async function registerInboxRoutes(app: FastifyInstance, opts: InboxRoute
   // default parameter value — Fastify always passes `{}`, never `undefined`.
   const llmDriver = opts.llmDriver ?? defaultLlmDriver;
 
-  app.get("/api/v1/inbox/threads", async (request, reply) => {
+  app.get("/api/v1/inbox/threads", { preHandler: requireAuth }, async (request, reply) => {
     const queryResult = inboxPaginationQuerySchema.safeParse(request.query);
     if (!queryResult.success) {
-      return reply.code(400).send({ error: { code: "INVALID_QUERY", message: "accountId is required" } });
+      return reply.code(400).send({ error: { code: "INVALID_QUERY", message: "Invalid pagination parameters" } });
     }
-    const { accountId, page, pageSize } = queryResult.data;
+    const { page, pageSize } = queryResult.data;
 
-    const threads = await listThreads(accountId, { page, pageSize });
+    const threads = await listThreads(request.accountId!, { page, pageSize });
     return reply.code(200).send({ threads, page, pageSize });
   });
 
-  app.get("/api/v1/inbox/threads/:threadId/messages", async (request, reply) => {
+  app.get("/api/v1/inbox/threads/:threadId/messages", { preHandler: requireAuth }, async (request, reply) => {
     const params = request.params as { threadId: string };
     const queryResult = inboxPaginationQuerySchema.safeParse(request.query);
     if (!queryResult.success) {
-      return reply.code(400).send({ error: { code: "INVALID_QUERY", message: "accountId is required" } });
+      return reply.code(400).send({ error: { code: "INVALID_QUERY", message: "Invalid pagination parameters" } });
     }
-    const { accountId, page, pageSize } = queryResult.data;
+    const { page, pageSize } = queryResult.data;
 
-    const messages = await getThreadMessages(accountId, params.threadId, { page, pageSize });
+    const messages = await getThreadMessages(request.accountId!, params.threadId, { page, pageSize });
     return reply.code(200).send({ messages, page, pageSize });
   });
 
-  app.post("/api/v1/inbox/threads/:threadId/messages", async (request, reply) => {
+  app.post("/api/v1/inbox/threads/:threadId/messages", { preHandler: requireAuth }, async (request, reply) => {
     const params = request.params as { threadId: string };
     const bodyResult = sendMessageRequestSchema.safeParse(request.body);
     if (!bodyResult.success) {
-      return reply
-        .code(400)
-        .send({ error: { code: "INVALID_PAYLOAD", message: "accountId and content are required" } });
+      return reply.code(400).send({ error: { code: "INVALID_PAYLOAD", message: "content is required" } });
     }
-    const { accountId, content } = bodyResult.data;
+    const { content } = bodyResult.data;
+    const accountId = request.accountId!;
 
     const message = await createHostMessage(accountId, params.threadId, content);
     await publishInboxMessage(accountId, { threadId: params.threadId, message });
@@ -56,13 +52,9 @@ export async function registerInboxRoutes(app: FastifyInstance, opts: InboxRoute
     return reply.code(201).send({ message });
   });
 
-  app.post("/api/v1/inbox/threads/:threadId/suggest-reply", async (request, reply) => {
+  app.post("/api/v1/inbox/threads/:threadId/suggest-reply", { preHandler: requireAuth }, async (request, reply) => {
     const params = request.params as { threadId: string };
-    const bodyResult = suggestReplyRequestSchema.safeParse(request.body);
-    if (!bodyResult.success) {
-      return reply.code(400).send({ error: { code: "INVALID_PAYLOAD", message: "accountId is required" } });
-    }
-    const { accountId } = bodyResult.data;
+    const accountId = request.accountId!;
 
     const context = await getThreadContext(accountId, params.threadId);
     if (!context) {

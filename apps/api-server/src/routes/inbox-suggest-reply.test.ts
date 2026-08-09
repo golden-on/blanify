@@ -3,6 +3,7 @@ import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { db, withTenant, accounts, properties, units, threads } from "@repo/db";
 import { registerInboxRoutes } from "./inbox";
+import { signToken } from "../auth";
 import type { LLMDriver, SuggestReplyContext } from "../ai/llm-client";
 
 let reachable = true;
@@ -17,9 +18,11 @@ describe.skipIf(!reachable)("POST /api/v1/inbox/threads/:threadId/suggest-reply"
   let property: { id: string };
   let unit: { id: string };
   let thread: { id: string };
+  let token: string;
 
   beforeAll(async () => {
     account = (await db.insert(accounts).values({ name: "Suggest Reply Test Tenant" }).returning())[0]!;
+    token = signToken({ sub: crypto.randomUUID(), accountId: account.id, email: "host@example.com" });
 
     property = await withTenant(account.id, async (tx) => {
       const [row] = await tx
@@ -72,7 +75,7 @@ describe.skipIf(!reachable)("POST /api/v1/inbox/threads/:threadId/suggest-reply"
     const response = await app.inject({
       method: "POST",
       url: `/api/v1/inbox/threads/${thread.id}/suggest-reply`,
-      payload: { accountId: account.id },
+      headers: { authorization: `Bearer ${token}` },
     });
 
     expect(response.statusCode).toBe(200);
@@ -93,10 +96,27 @@ describe.skipIf(!reachable)("POST /api/v1/inbox/threads/:threadId/suggest-reply"
     const response = await app.inject({
       method: "POST",
       url: "/api/v1/inbox/threads/00000000-0000-0000-0000-000000000000/suggest-reply",
-      payload: { accountId: account.id },
+      headers: { authorization: `Bearer ${token}` },
     });
 
     expect(response.statusCode).toBe(404);
+    expect(fakeDriver.generateReply).not.toHaveBeenCalled();
+
+    await app.close();
+  }, 20000);
+
+  it("returns 401 without a token", async () => {
+    const app = Fastify();
+    const fakeDriver: LLMDriver = { generateReply: vi.fn() };
+    await registerInboxRoutes(app, { llmDriver: fakeDriver });
+    await app.ready();
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/api/v1/inbox/threads/${thread.id}/suggest-reply`,
+    });
+
+    expect(response.statusCode).toBe(401);
     expect(fakeDriver.generateReply).not.toHaveBeenCalled();
 
     await app.close();

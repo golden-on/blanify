@@ -7,3 +7,5 @@ export * from "./payments";
 export * from "./inbox";
 export * from "./pricing";
 export * from "./smart-locks";
+export * from "./auth";
+export * from "./host";

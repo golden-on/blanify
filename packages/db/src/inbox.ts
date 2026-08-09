@@ -19,6 +19,10 @@ export async function listThreads(accountId: string, { page, pageSize }: PagePar
       .select({
         thread: threads,
         unreadCount: sql<number>`count(${messages.id}) filter (where ${messages.isRead} = false)`.mapWith(Number),
+        // Correlated subquery for the sidebar's "last message preview" — cheaper than an
+        // extra per-thread round trip, and the aggregate query above can't otherwise
+        // single out one specific message's content once messages are joined+grouped.
+        lastMessagePreview: sql<string | null>`(select m2.content from messages m2 where m2.thread_id = ${threads.id} order by m2.created_at desc limit 1)`,
       })
       .from(threads)
       .leftJoin(messages, eq(messages.threadId, threads.id))
@@ -27,7 +31,7 @@ export async function listThreads(accountId: string, { page, pageSize }: PagePar
       .limit(pageSize)
       .offset(offset);
 
-    return rows.map(({ thread, unreadCount }) => ({ ...thread, unreadCount }));
+    return rows.map(({ thread, unreadCount, lastMessagePreview }) => ({ ...thread, unreadCount, lastMessagePreview }));
   });
 }
 
