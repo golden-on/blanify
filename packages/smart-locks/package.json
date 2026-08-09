@@ -1,5 +1,5 @@
 {
-  "name": "@repo/queue",
+  "name": "@repo/smart-locks",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -9,23 +9,16 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "dev": "dotenv -e ../../.env -- tsx watch src/worker.ts",
     "lint": "eslint . --ext .ts",
     "typecheck": "tsc --noEmit",
     "test": "dotenv -e ../../.env -- vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@repo/channel-sync": "workspace:*",
-    "@repo/db": "workspace:*",
-    "@repo/shared-types": "workspace:*",
-    "@repo/smart-locks": "workspace:*",
-    "bullmq": "^5.34.0",
-    "ioredis": "^5.4.1"
+    "@repo/shared-types": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
     "dotenv-cli": "^8.0.0",
-    "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
   }

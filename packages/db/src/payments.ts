@@ -34,7 +34,12 @@ export async function recordPendingPayment(input: RecordPendingPaymentInput) {
   });
 }
 
-export async function processStripeWebhookEvent(webhookEventId: string): Promise<void> {
+export interface ProcessedStripeWebhookResult {
+  accountId: string;
+  reservationId: string;
+}
+
+export async function processStripeWebhookEvent(webhookEventId: string): Promise<ProcessedStripeWebhookResult | null> {
   const [event] = await db.select().from(webhookEvents).where(eq(webhookEvents.id, webhookEventId));
   if (!event) {
     throw new ChannelSyncError(`Webhook event ${webhookEventId} not found`);
@@ -42,7 +47,7 @@ export async function processStripeWebhookEvent(webhookEventId: string): Promise
 
   if (event.status === "processed") {
     // Already handled — avoid reprocessing on job redelivery (BullMQ retry after a lost ack).
-    return;
+    return null;
   }
 
   try {
@@ -76,6 +81,8 @@ export async function processStripeWebhookEvent(webhookEventId: string): Promise
         .update(webhookEvents)
         .set({ status: "processed", processedAt: new Date(), errorMessage: null, updatedAt: new Date() })
         .where(eq(webhookEvents.id, webhookEventId));
+
+      return { accountId, reservationId: reservation.id };
     } catch (err) {
       if (err instanceof ConcurrencyError) {
         // The dates are permanently gone — retrying changes nothing. Mark this payment
@@ -92,7 +99,7 @@ export async function processStripeWebhookEvent(webhookEventId: string): Promise
           .update(webhookEvents)
           .set({ status: "failed", errorMessage: err.message, updatedAt: new Date() })
           .where(eq(webhookEvents.id, webhookEventId));
-        return;
+        return null;
       }
       throw err;
     }

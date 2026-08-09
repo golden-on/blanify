@@ -15,3 +15,12 @@ export class ChannelSyncError extends Error {
     this.name = "ChannelSyncError";
   }
 }
+
+export class TenantAccessError extends Error {
+  readonly code = "TENANT_ACCESS_DENIED";
+
+  constructor(message: string) {
+    super(message);
+    this.name = "TenantAccessError";
+  }
+}

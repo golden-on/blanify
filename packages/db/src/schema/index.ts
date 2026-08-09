@@ -15,3 +15,6 @@ export * from "./threads";
 export * from "./messages";
 export * from "./automation-rules";
 export * from "./automation-dispatches";
+export * from "./smart-locks";
+export * from "./access-codes";
+export * from "./pricing-integrations";

@@ -6,6 +6,7 @@ import { registerCheckoutRoutes } from "./routes/checkout";
 import { registerStripeWebhookRoutes } from "./routes/stripe-webhook";
 import { registerInboxRoutes } from "./routes/inbox";
 import { registerInboxWsRoutes } from "./routes/inbox-ws";
+import { registerPricingWebhookRoutes } from "./routes/pricing-webhook";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -38,6 +39,7 @@ export function buildApp(): FastifyInstance {
   app.register(registerStripeWebhookRoutes);
   app.register(registerInboxRoutes);
   app.register(registerInboxWsRoutes);
+  app.register(registerPricingWebhookRoutes);
 
   return app;
 }

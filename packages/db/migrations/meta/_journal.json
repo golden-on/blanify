@@ -57,6 +57,13 @@
       "when": 1786238145343,
       "tag": "0007_curved_triathlon",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786289878978,
+      "tag": "0008_foamy_bedlam",
+      "breakpoints": true
     }
   ]
 }

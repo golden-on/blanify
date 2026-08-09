@@ -235,6 +235,9 @@ importers:
       '@repo/shared-types':
         specifier: workspace:*
         version: link:../shared-types
+      '@repo/smart-locks':
+        specifier: workspace:*
+        version: link:../smart-locks
       bullmq:
         specifier: ^5.34.0
         version: 5.81.3
@@ -264,6 +267,25 @@ importers:
         specifier: ^3.24.1
         version: 3.25.76
     devDependencies:
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.20.1)(jsdom@25.0.1)(lightningcss@1.32.0)
+
+  packages/smart-locks:
+    dependencies:
+      '@repo/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.20.1
+      dotenv-cli:
+        specifier: ^8.0.0
+        version: 8.0.0
       typescript:
         specifier: ^5.7.2
         version: 5.9.3

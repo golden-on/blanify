@@ -5,3 +5,5 @@ export * from "./webhooks";
 export * from "./websites";
 export * from "./payments";
 export * from "./inbox";
+export * from "./pricing";
+export * from "./smart-locks";

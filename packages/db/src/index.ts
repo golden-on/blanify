@@ -8,3 +8,5 @@ export * from "./payments";
 export * from "./stripe-accounts";
 export * from "./inbox";
 export * from "./automation";
+export * from "./smart-locks";
+export * from "./pricing";

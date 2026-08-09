@@ -151,7 +151,7 @@ describe.skipIf(!reachable)("processStripeWebhookEvent", () => {
       })
       .returning();
 
-    await expect(processStripeWebhookEvent(event!.id)).resolves.toBeUndefined();
+    await expect(processStripeWebhookEvent(event!.id)).resolves.toBeNull();
 
     const payment = await withTenant(account.id, async (tx) => {
       const [row] = await tx.select().from(payments).where(eq(payments.stripePaymentIntentId, paymentIntentId));
