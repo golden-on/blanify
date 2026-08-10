@@ -247,11 +247,23 @@ COMMIT;
 
 ---
 
-### Phase 11: Enterprise Financials, Tax & Analytics (Planned)
-* Localized Tax Jurisdiction Engine (VAT / tourist occupancy tax rules at checkout).
-* Automated Guest Invoicing (PDF generation queue worker).
-* Security Deposit Claims Workflow (exercising the Phase 6 `capture_method: 'manual'` pre-auth hold).
-* Real-Time RevPAR / ADR / Occupancy performance analytics dashboard.
+### Phase 11: Enterprise Financials, Tax Engine & Advanced Analytics
+
+* **Tax Jurisdiction Engine:**
+  * `tax_rules` schema (`jurisdiction`, `tax_type`, `rate_type`, `rate_value`, `applies_to_unit_id`).
+  * Layer tax line items into `/api/v1/public/checkout/create-session` totals.
+
+* **Automated Guest Invoicing:**
+  * `invoices` schema (`invoice_number`, `line_items`, `subtotal_in_cents`, `tax_in_cents`, `total_in_cents`, `pdf_url`).
+  * BullMQ invoice worker generating numbered guest invoice records upon reservation confirmation.
+
+* **Security Deposit Claims Workflow:**
+  * `deposit_claims` schema (`amount_in_cents`, `reason`, `status`, `evidence_urls`).
+  * Exercise Phase 6 pre-auth holds via `stripe.paymentIntents.capture()` on deposit claims.
+
+* **Real-Time RevPAR / ADR Analytics:**
+  * `/api/v1/host/analytics` route computing Occupancy Rate, ADR, and RevPAR over requested date windows.
+  * Analytics dashboard view in `apps/web-admin`.
 
 ---
 

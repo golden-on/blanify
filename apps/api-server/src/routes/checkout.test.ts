@@ -14,8 +14,10 @@ import {
   ensureNightlyAvailability,
   createAddOn,
   createDiscount,
+  createTaxRule,
   unitAddOns,
   discounts,
+  taxRules,
 } from "@repo/db";
 import { registerCheckoutRoutes, type CheckoutClient } from "./checkout";
 
@@ -317,5 +319,144 @@ describe.skipIf(!reachable)("POST /api/v1/public/checkout/create-session", () =>
     expect(stripeClient.checkout.sessions.create).not.toHaveBeenCalled();
 
     await app.close();
+  });
+
+  // Tax rules apply account-wide when unscoped, so each of these tests uses its own
+  // dedicated account — an account-wide rule here would otherwise silently change the
+  // expected totals of every test above that shares `account`.
+  describe("tax rules", () => {
+    async function seedTaxTestTenant(name: string) {
+      const taxAccount = (await db.insert(accounts).values({ name }).returning())[0]!;
+      const taxProperty = await withTenant(taxAccount.id, async (tx) => {
+        const [row] = await tx.insert(properties).values({ accountId: taxAccount.id, name: "Property" }).returning();
+        return row!;
+      });
+      const taxUnitA = await withTenant(taxAccount.id, async (tx) => {
+        const [row] = await tx.insert(units).values({ accountId: taxAccount.id, propertyId: taxProperty.id, name: "Unit A" }).returning();
+        return row!;
+      });
+      const taxUnitB = await withTenant(taxAccount.id, async (tx) => {
+        const [row] = await tx.insert(units).values({ accountId: taxAccount.id, propertyId: taxProperty.id, name: "Unit B" }).returning();
+        return row!;
+      });
+      await withTenant(taxAccount.id, (tx) =>
+        tx.insert(stripeAccounts).values({
+          accountId: taxAccount.id,
+          stripeAccountId: `acct_test_tax_${taxAccount.id}`,
+          chargesEnabled: true,
+          payoutsEnabled: true,
+        }),
+      );
+      return { taxAccount, taxProperty, taxUnitA, taxUnitB };
+    }
+
+    async function cleanupTaxTestTenant(taxAccount: { id: string }, taxProperty: { id: string }, taxUnits: { id: string }[]) {
+      await withTenant(taxAccount.id, (tx) => tx.delete(taxRules).where(eq(taxRules.accountId, taxAccount.id)));
+      await withTenant(taxAccount.id, (tx) => tx.delete(payments).where(eq(payments.accountId, taxAccount.id)));
+      for (const u of taxUnits) {
+        await withTenant(taxAccount.id, (tx) => tx.delete(nightlyAvailability).where(eq(nightlyAvailability.unitId, u.id)));
+      }
+      await withTenant(taxAccount.id, (tx) => tx.delete(stripeAccounts).where(eq(stripeAccounts.accountId, taxAccount.id)));
+      for (const u of taxUnits) {
+        await withTenant(taxAccount.id, (tx) => tx.delete(units).where(eq(units.id, u.id)));
+      }
+      await withTenant(taxAccount.id, (tx) => tx.delete(properties).where(eq(properties.id, taxProperty.id)));
+      await db.delete(accounts).where(eq(accounts.id, taxAccount.id));
+    }
+
+    it("applies a percentage tax rule as its own Stripe line item and adds it to the total", async () => {
+      const { taxAccount, taxProperty, taxUnitA, taxUnitB } = await seedTaxTestTenant("Tax Route Test Tenant Percentage");
+      await ensureNightlyAvailability(taxAccount.id, taxUnitA.id, ["2029-03-01", "2029-03-02"], 10000);
+      await createTaxRule(taxAccount.id, { jurisdiction: "City of Springfield", taxType: "tourist_tax", rateType: "percentage", rateValue: 0.08, appliesToUnitId: taxUnitA.id });
+
+      const app = Fastify();
+      const stripeClient = fakeStripeClient({ paymentIntentId: "pi_test_tax_percentage" });
+      await registerCheckoutRoutes(app, { stripeClient });
+      await app.ready();
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/v1/public/checkout/create-session",
+        payload: { accountId: taxAccount.id, unitId: taxUnitA.id, checkIn: "2029-03-01", checkOut: "2029-03-03" },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(stripeClient.checkout.sessions.create).toHaveBeenCalledWith(
+        expect.objectContaining({ line_items: expect.arrayContaining([expect.anything(), expect.anything()]) }),
+      );
+
+      const payment = await withTenant(taxAccount.id, async (tx) => {
+        const [row] = await tx.select().from(payments).where(eq(payments.stripePaymentIntentId, "pi_test_tax_percentage"));
+        return row;
+      });
+      // 2 nights @ 10000 = 20000 nightly; 8% tax = round(20000 * 0.08) = 1600 -> 21600.
+      expect(payment?.amountInCents).toBe(21600);
+
+      await app.close();
+      await cleanupTaxTestTenant(taxAccount, taxProperty, [taxUnitA, taxUnitB]);
+    }, 45000);
+
+    it("scales a per-night-flat tax rule by the number of stay nights", async () => {
+      const { taxAccount, taxProperty, taxUnitA, taxUnitB } = await seedTaxTestTenant("Tax Route Test Tenant Flat");
+      await ensureNightlyAvailability(taxAccount.id, taxUnitA.id, ["2029-04-01", "2029-04-02"], 10000);
+      await createTaxRule(taxAccount.id, { jurisdiction: "City of Springfield", taxType: "tourist_tax", rateType: "per_night_flat", rateValue: 500, appliesToUnitId: taxUnitA.id });
+
+      const app = Fastify();
+      const stripeClient = fakeStripeClient({ paymentIntentId: "pi_test_tax_flat" });
+      await registerCheckoutRoutes(app, { stripeClient });
+      await app.ready();
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/v1/public/checkout/create-session",
+        payload: { accountId: taxAccount.id, unitId: taxUnitA.id, checkIn: "2029-04-01", checkOut: "2029-04-03" },
+      });
+
+      expect(response.statusCode).toBe(200);
+
+      const payment = await withTenant(taxAccount.id, async (tx) => {
+        const [row] = await tx.select().from(payments).where(eq(payments.stripePaymentIntentId, "pi_test_tax_flat"));
+        return row;
+      });
+      // 2 nights @ 10000 = 20000 nightly; flat tax 500/night * 2 nights = 1000 -> 21000.
+      expect(payment?.amountInCents).toBe(21000);
+
+      await app.close();
+      await cleanupTaxTestTenant(taxAccount, taxProperty, [taxUnitA, taxUnitB]);
+    }, 45000);
+
+    it("does not apply a unit-scoped tax rule to a different unit in the same account", async () => {
+      const { taxAccount, taxProperty, taxUnitA, taxUnitB } = await seedTaxTestTenant("Tax Route Test Tenant Scoped");
+      await ensureNightlyAvailability(taxAccount.id, taxUnitB.id, ["2029-05-01", "2029-05-02"], 10000);
+      await createTaxRule(taxAccount.id, { jurisdiction: "City of Springfield", taxType: "vat", rateType: "percentage", rateValue: 0.2, appliesToUnitId: taxUnitA.id });
+
+      const app = Fastify();
+      const stripeClient = fakeStripeClient({ paymentIntentId: "pi_test_tax_unscoped" });
+      await registerCheckoutRoutes(app, { stripeClient });
+      await app.ready();
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/v1/public/checkout/create-session",
+        payload: { accountId: taxAccount.id, unitId: taxUnitB.id, checkIn: "2029-05-01", checkOut: "2029-05-03" },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(stripeClient.checkout.sessions.create).toHaveBeenCalledWith(
+        expect.objectContaining({ line_items: expect.arrayContaining([expect.anything()]) }),
+      );
+      const call = (stripeClient.checkout.sessions.create as ReturnType<typeof vi.fn>).mock.calls[0]![0] as { line_items: unknown[] };
+      expect(call.line_items).toHaveLength(1);
+
+      const payment = await withTenant(taxAccount.id, async (tx) => {
+        const [row] = await tx.select().from(payments).where(eq(payments.stripePaymentIntentId, "pi_test_tax_unscoped"));
+        return row;
+      });
+      // No tax rule applies to taxUnitB -> total stays at the plain nightly total.
+      expect(payment?.amountInCents).toBe(20000);
+
+      await app.close();
+      await cleanupTaxTestTenant(taxAccount, taxProperty, [taxUnitA, taxUnitB]);
+    }, 45000);
   });
 });

@@ -17,6 +17,13 @@ export const stripeCheckoutMetadataSchema = z.object({
   unitId: idSchema,
   checkIn: dateStringSchema,
   checkOut: dateStringSchema,
+  // Threaded through so the invoice worker (which only sees the already-
+  // processed webhook event, long after the checkout request is gone) has the
+  // exact checkout-time figures without recomputing them — nothing else
+  // persists which add-ons/promo code a reservation actually used.
+  subtotalInCents: z.coerce.number().int().nonnegative(),
+  taxInCents: z.coerce.number().int().nonnegative(),
+  lineItemsJson: z.string(),
 });
 
 export const stripeCheckoutSessionObjectSchema = z.object({

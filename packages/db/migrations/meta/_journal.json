@@ -85,6 +85,13 @@
       "when": 1786316871799,
       "tag": "0011_spooky_the_phantom",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1786371549302,
+      "tag": "0012_majestic_siren",
+      "breakpoints": true
     }
   ]
 }

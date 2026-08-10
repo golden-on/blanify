@@ -27,3 +27,6 @@ export * from "./payout-statements";
 export * from "./discounts";
 export * from "./unit-add-ons";
 export * from "./guest-sessions";
+export * from "./tax-rules";
+export * from "./invoices";
+export * from "./deposit-claims";

@@ -18,3 +18,7 @@ export * from "./owners";
 export * from "./discounts";
 export * from "./add-ons";
 export * from "./guest";
+export * from "./tax-rules";
+export * from "./invoices";
+export * from "./deposit-claims";
+export * from "./analytics";

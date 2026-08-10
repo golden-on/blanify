@@ -3,7 +3,9 @@ import type Stripe from "stripe";
 import { and, eq, inArray } from "drizzle-orm";
 import { checkoutSessionRequestSchema } from "@repo/shared-types";
 import {
+  computeTaxForRules,
   evaluateDiscount,
+  getApplicableTaxRules,
   getStripeAccountForTenant,
   getUnitAddOns,
   nightlyAvailability,
@@ -101,7 +103,12 @@ export async function registerCheckoutRoutes(app: FastifyInstance, opts: Checkou
       discountInCents = discountResult.discountInCents;
     }
 
-    const totalInCents = Math.max(0, nightlyTotalInCents + addOnsTotalInCents - discountInCents);
+    const subtotalInCents = Math.max(0, nightlyTotalInCents + addOnsTotalInCents - discountInCents);
+
+    const applicableTaxRules = await getApplicableTaxRules(accountId, unitId);
+    const { taxInCents, lineItems: taxLineItems } = computeTaxForRules(applicableTaxRules, subtotalInCents, dates.length);
+
+    const totalInCents = subtotalInCents + taxInCents;
 
     const stripeAccount = await getStripeAccountForTenant(accountId);
     if (!stripeAccount || !stripeAccount.chargesEnabled) {
@@ -137,6 +144,27 @@ export async function registerCheckoutRoutes(app: FastifyInstance, opts: Checkou
           product_data: { name: addOn.name },
         },
       })),
+      ...taxLineItems
+        .filter((tax) => tax.amountInCents > 0)
+        .map((tax) => ({
+          quantity: 1,
+          price_data: {
+            currency: "usd",
+            unit_amount: tax.amountInCents,
+            product_data: { name: tax.label },
+          },
+        })),
+    ];
+
+    // Threaded through Stripe metadata so the invoice-generation worker (which
+    // only sees the already-processed webhook event, long after this request is
+    // gone) has the exact checkout-time breakdown without recomputing it — see
+    // Decision 3 in the Phase 11 plan.
+    const invoiceLineItems = [
+      { label: "Nightly rate", amountInCents: nightlyTotalInCents },
+      ...includedAddOns.map(({ addOn, totalInCents: addOnTotal }) => ({ label: addOn.name, amountInCents: addOnTotal })),
+      ...(discountInCents > 0 ? [{ label: "Discount", amountInCents: -discountInCents }] : []),
+      ...taxLineItems.map((tax) => ({ label: tax.label, amountInCents: tax.amountInCents })),
     ];
 
     const session = await stripeClient.checkout.sessions.create({
@@ -147,7 +175,15 @@ export async function registerCheckoutRoutes(app: FastifyInstance, opts: Checkou
         capture_method: "manual",
         transfer_data: { destination: stripeAccount.stripeAccountId },
       },
-      metadata: { accountId, unitId, checkIn, checkOut },
+      metadata: {
+        accountId,
+        unitId,
+        checkIn,
+        checkOut,
+        subtotalInCents: String(subtotalInCents),
+        taxInCents: String(taxInCents),
+        lineItemsJson: JSON.stringify(invoiceLineItems),
+      },
       success_url: process.env.STRIPE_CHECKOUT_SUCCESS_URL ?? "http://localhost:3001/booking/success",
       cancel_url: process.env.STRIPE_CHECKOUT_CANCEL_URL ?? "http://localhost:3001/booking/cancel",
     });

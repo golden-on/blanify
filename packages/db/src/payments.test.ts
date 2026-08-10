@@ -101,6 +101,9 @@ describe.skipIf(!reachable)("processStripeWebhookEvent", () => {
           unitId: unit.id,
           checkIn: "2028-06-01",
           checkOut: "2028-06-03",
+          subtotalInCents: "20000",
+          taxInCents: "0",
+          lineItemsJson: JSON.stringify([{ label: "Nightly rate", amountInCents: 20000 }]),
         }),
       })
       .returning();
@@ -151,7 +154,15 @@ describe.skipIf(!reachable)("processStripeWebhookEvent", () => {
           "evt-stripe-checkout-completed-conflict",
           "cs_test_conflict_1",
           paymentIntentId,
-          { accountId: account.id, unitId: unit.id, checkIn: "2028-06-10", checkOut: "2028-06-12" },
+          {
+            accountId: account.id,
+            unitId: unit.id,
+            checkIn: "2028-06-10",
+            checkOut: "2028-06-12",
+            subtotalInCents: "20000",
+            taxInCents: "0",
+            lineItemsJson: JSON.stringify([{ label: "Nightly rate", amountInCents: 20000 }]),
+          },
         ),
       })
       .returning();

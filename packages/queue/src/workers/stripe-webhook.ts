@@ -4,6 +4,7 @@ import { processStripeWebhookEvent } from "@repo/db";
 import { connection } from "../connection";
 import { STRIPE_WEBHOOK_QUEUE, stripeWebhookQueue, stripeWebhookDlq } from "../queues/stripe-webhook";
 import { enqueueSmartLockAccess } from "../queues/smart-lock-access";
+import { enqueueInvoiceGeneration } from "../queues/invoice-generation";
 
 export const stripeWebhookWorker = new Worker(
   STRIPE_WEBHOOK_QUEUE,
@@ -12,6 +13,7 @@ export const stripeWebhookWorker = new Worker(
     const result = await processStripeWebhookEvent(webhookEventId);
     if (result) {
       await enqueueSmartLockAccess(result);
+      await enqueueInvoiceGeneration(result);
     }
   },
   { connection },

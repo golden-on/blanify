@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { ChannelSyncError, ConcurrencyError, stripeCheckoutSessionObjectSchema } from "@repo/shared-types";
+import { ChannelSyncError, ConcurrencyError, invoiceLineItemSchema, stripeCheckoutSessionObjectSchema } from "@repo/shared-types";
 import { db } from "./client";
 import { withTenant } from "./tenant-context";
 import { createReservation } from "./inventory";
@@ -38,6 +38,10 @@ export async function recordPendingPayment(input: RecordPendingPaymentInput) {
 export interface ProcessedStripeWebhookResult {
   accountId: string;
   reservationId: string;
+  paymentId: string;
+  subtotalInCents: number;
+  taxInCents: number;
+  lineItems: { label: string; amountInCents: number }[];
 }
 
 export async function processStripeWebhookEvent(webhookEventId: string): Promise<ProcessedStripeWebhookResult | null> {
@@ -54,7 +58,14 @@ export async function processStripeWebhookEvent(webhookEventId: string): Promise
   try {
     const stripeEvent = event.payload as { data?: { object?: unknown } };
     const session = stripeCheckoutSessionObjectSchema.parse(stripeEvent.data?.object);
-    const { accountId, unitId, checkIn, checkOut } = session.metadata;
+    const { accountId, unitId, checkIn, checkOut, subtotalInCents, taxInCents, lineItemsJson } = session.metadata;
+
+    let lineItems: { label: string; amountInCents: number }[];
+    try {
+      lineItems = invoiceLineItemSchema.array().parse(JSON.parse(lineItemsJson));
+    } catch {
+      throw new ChannelSyncError(`Malformed lineItemsJson metadata on checkout session ${session.payment_intent}`);
+    }
 
     const payment = await withTenant(accountId, async (tx) => {
       const [row] = await tx
@@ -93,13 +104,13 @@ export async function processStripeWebhookEvent(webhookEventId: string): Promise
         .set({ status: "processed", processedAt: new Date(), errorMessage: null, updatedAt: new Date() })
         .where(eq(webhookEvents.id, webhookEventId));
 
-      return { accountId, reservationId: reservation.id };
+      return { accountId, reservationId: reservation.id, paymentId: payment.id, subtotalInCents, taxInCents, lineItems };
     } catch (err) {
       if (err instanceof ConcurrencyError) {
         // The dates are permanently gone — retrying changes nothing. Mark this payment
         // and webhook event failed, but don't rethrow: the job is done (no DLQ entry
-        // for a deterministic outcome). The guest was never charged since capture is
-        // manual and this phase never calls paymentIntents.capture().
+        // for a deterministic outcome). Since a reservation never got created, no
+        // invoice/deposit-claim flow ever touches this payment either.
         await withTenant(accountId, (tx) =>
           tx
             .update(payments)
@@ -124,4 +135,11 @@ export async function processStripeWebhookEvent(webhookEventId: string): Promise
 
     throw err instanceof ChannelSyncError ? err : new ChannelSyncError(`Stripe webhook processing failed: ${message}`);
   }
+}
+
+export async function getPaymentByReservationId(accountId: string, reservationId: string) {
+  const [payment] = await withTenant(accountId, (tx) =>
+    tx.select().from(payments).where(eq(payments.reservationId, reservationId)),
+  );
+  return payment ?? null;
 }
