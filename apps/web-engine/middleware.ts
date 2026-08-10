@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export const config = {
-  matcher: ["/((?!_next/|sites/|favicon.ico).*)"],
+  // `guest/` is excluded because it's a direct reservation-token lookup
+  // (app/guest/[token]/page.tsx), not a tenant marketing site — forcing it through
+  // host-based site resolution below would 404 it before the route is ever reached.
+  matcher: ["/((?!_next/|sites/|guest/|favicon.ico).*)"],
 };
 
 export default async function middleware(request: NextRequest) {

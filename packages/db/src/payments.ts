@@ -5,6 +5,7 @@ import { withTenant } from "./tenant-context";
 import { createReservation } from "./inventory";
 import { webhookEvents } from "./schema/webhook-events";
 import { payments } from "./schema/payments";
+import { guestSessions } from "./schema/guest-sessions";
 
 export interface RecordPendingPaymentInput {
   accountId: string;
@@ -76,6 +77,16 @@ export async function processStripeWebhookEvent(webhookEventId: string): Promise
           .set({ reservationId: reservation.id, status: "succeeded", updatedAt: new Date() })
           .where(eq(payments.id, payment.id)),
       );
+
+      // Mints the guest's self-service portal link right away — guest_sessions has no
+      // RLS (it must be readable by token alone, before any tenant is known; see
+      // schema/guest-sessions.ts), so this insert is the only trusted writer.
+      // onConflictDoNothing makes this safe against webhook redelivery.
+      await db.insert(guestSessions).values({
+        accountId,
+        reservationId: reservation.id,
+        token: crypto.randomUUID(),
+      }).onConflictDoNothing({ target: [guestSessions.reservationId] });
 
       await db
         .update(webhookEvents)

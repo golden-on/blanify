@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { CalendarDays, ClipboardList, Inbox, LogOut, Users } from "lucide-react";
+import { CalendarDays, ClipboardList, Inbox, LogOut, Percent, PlusCircle, Users } from "lucide-react";
 import { useSession, type UserRole } from "@/lib/session";
 
 const NAV_ITEMS: { href: string; label: string; icon: typeof CalendarDays; roles?: UserRole[] }[] = [
@@ -11,6 +11,8 @@ const NAV_ITEMS: { href: string; label: string; icon: typeof CalendarDays; roles
   { href: "/inbox", label: "Inbox", icon: Inbox, roles: ["owner", "manager"] },
   { href: "/tasks", label: "Tasks", icon: ClipboardList },
   { href: "/owners", label: "Owners", icon: Users, roles: ["owner", "manager"] },
+  { href: "/discounts", label: "Discounts", icon: Percent, roles: ["owner", "manager"] },
+  { href: "/add-ons", label: "Add-Ons", icon: PlusCircle, roles: ["owner", "manager"] },
 ];
 
 export function NavShell({ children }: { children: React.ReactNode }) {

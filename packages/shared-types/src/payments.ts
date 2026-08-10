@@ -8,6 +8,8 @@ export const checkoutSessionRequestSchema = z.object({
   unitId: idSchema,
   checkIn: dateStringSchema,
   checkOut: dateStringSchema,
+  promoCode: z.string().min(1).optional(),
+  selectedAddOnIds: z.array(idSchema).optional().default([]),
 });
 
 export const stripeCheckoutMetadataSchema = z.object({

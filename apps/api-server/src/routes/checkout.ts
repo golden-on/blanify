@@ -2,7 +2,15 @@ import type { FastifyInstance } from "fastify";
 import type Stripe from "stripe";
 import { and, eq, inArray } from "drizzle-orm";
 import { checkoutSessionRequestSchema } from "@repo/shared-types";
-import { getStripeAccountForTenant, nightlyAvailability, nightsBetween, recordPendingPayment, withTenant } from "@repo/db";
+import {
+  evaluateDiscount,
+  getStripeAccountForTenant,
+  getUnitAddOns,
+  nightlyAvailability,
+  nightsBetween,
+  recordPendingPayment,
+  withTenant,
+} from "@repo/db";
 import { stripe } from "../stripe-client";
 
 export interface CheckoutClient {
@@ -11,6 +19,9 @@ export interface CheckoutClient {
       create(params: Stripe.Checkout.SessionCreateParams): Promise<Stripe.Checkout.Session>;
     };
   };
+  coupons: {
+    create(params: Stripe.CouponCreateParams): Promise<Stripe.Coupon>;
+  };
 }
 
 export interface CheckoutRouteDeps {
@@ -18,9 +29,9 @@ export interface CheckoutRouteDeps {
 }
 
 export async function registerCheckoutRoutes(app: FastifyInstance, opts: CheckoutRouteDeps = {}) {
-  // Fastify's `.register(plugin)` always calls plugins with an `opts` object (`{}`
-  // when none is passed), never `undefined` — so a default parameter value on `opts`
-  // itself would never apply. The fallback has to happen per-field instead.
+  // See routes/checkout.ts (this file) history for why this is a per-field fallback
+  // rather than a JS default parameter value — Fastify always passes `{}`, never
+  // `undefined`.
   const stripeClient = opts.stripeClient ?? stripe;
 
   app.post("/api/v1/public/checkout/create-session", async (request, reply) => {
@@ -30,7 +41,7 @@ export async function registerCheckoutRoutes(app: FastifyInstance, opts: Checkou
         .code(400)
         .send({ error: { code: "INVALID_PAYLOAD", message: "accountId, unitId, checkIn, and checkOut are required" } });
     }
-    const { accountId, unitId, checkIn, checkOut } = bodyResult.data;
+    const { accountId, unitId, checkIn, checkOut, promoCode, selectedAddOnIds } = bodyResult.data;
 
     const dates = nightsBetween(checkIn, checkOut);
     if (dates.length === 0) {
@@ -58,7 +69,39 @@ export async function registerCheckoutRoutes(app: FastifyInstance, opts: Checkou
       });
     }
 
-    const amountInCents = nights.reduce((sum, night) => sum + (night.priceInCents ?? 0), 0);
+    const nightlyTotalInCents = nights.reduce((sum, night) => sum + (night.priceInCents ?? 0), 0);
+
+    const unitAddOns = await getUnitAddOns(accountId, unitId);
+    const invalidAddOnIds = selectedAddOnIds.filter((id) => !unitAddOns.some((addOn) => addOn.id === id));
+    if (invalidAddOnIds.length > 0) {
+      return reply.code(400).send({
+        error: { code: "INVALID_ADD_ON", message: `Add-on(s) not found for this unit: ${invalidAddOnIds.join(", ")}` },
+      });
+    }
+
+    const includedAddOns = unitAddOns
+      .filter((addOn) => addOn.isRequired || selectedAddOnIds.includes(addOn.id))
+      .map((addOn) => ({
+        addOn,
+        totalInCents: addOn.feeType === "per_night" ? addOn.priceInCents * dates.length : addOn.priceInCents,
+      }));
+    const addOnsTotalInCents = includedAddOns.reduce((sum, { totalInCents }) => sum + totalInCents, 0);
+
+    let discountInCents = 0;
+    if (promoCode) {
+      const discountResult = await evaluateDiscount({
+        accountId,
+        code: promoCode,
+        nightlyTotalInCents,
+        stayNights: dates.length,
+      });
+      if (!discountResult.valid) {
+        return reply.code(400).send({ error: { code: "INVALID_PROMO_CODE", message: discountResult.reason } });
+      }
+      discountInCents = discountResult.discountInCents;
+    }
+
+    const totalInCents = Math.max(0, nightlyTotalInCents + addOnsTotalInCents - discountInCents);
 
     const stripeAccount = await getStripeAccountForTenant(accountId);
     if (!stripeAccount || !stripeAccount.chargesEnabled) {
@@ -67,18 +110,39 @@ export async function registerCheckoutRoutes(app: FastifyInstance, opts: Checkou
       });
     }
 
+    // Stripe rejects negative unit_amount, so an itemized discount can't be a line
+    // item — it has to be a dynamically created, single-use coupon attached via
+    // `discounts`. Line items stay itemized and positive (nightly rate + each
+    // included add-on).
+    let sessionDiscounts: Stripe.Checkout.SessionCreateParams.Discount[] | undefined;
+    if (discountInCents > 0) {
+      const coupon = await stripeClient.coupons.create({ amount_off: discountInCents, currency: "usd", duration: "once" });
+      sessionDiscounts = [{ coupon: coupon.id }];
+    }
+
+    const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
+      {
+        quantity: 1,
+        price_data: {
+          currency: "usd",
+          unit_amount: nightlyTotalInCents,
+          product_data: { name: `Nightly rate for unit ${unitId} (${checkIn} to ${checkOut})` },
+        },
+      },
+      ...includedAddOns.map(({ addOn, totalInCents: addOnTotal }) => ({
+        quantity: 1,
+        price_data: {
+          currency: "usd",
+          unit_amount: addOnTotal,
+          product_data: { name: addOn.name },
+        },
+      })),
+    ];
+
     const session = await stripeClient.checkout.sessions.create({
       mode: "payment",
-      line_items: [
-        {
-          quantity: 1,
-          price_data: {
-            currency: "usd",
-            unit_amount: amountInCents,
-            product_data: { name: `Reservation for unit ${unitId} (${checkIn} to ${checkOut})` },
-          },
-        },
-      ],
+      line_items: lineItems,
+      ...(sessionDiscounts ? { discounts: sessionDiscounts } : {}),
       payment_intent_data: {
         capture_method: "manual",
         transfer_data: { destination: stripeAccount.stripeAccountId },
@@ -97,7 +161,7 @@ export async function registerCheckoutRoutes(app: FastifyInstance, opts: Checkou
     await recordPendingPayment({
       accountId,
       stripePaymentIntentId: session.payment_intent,
-      amountInCents,
+      amountInCents: totalInCents,
       currency: "usd",
     });
 

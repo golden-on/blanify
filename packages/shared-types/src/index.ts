@@ -11,3 +11,6 @@ export * from "./auth";
 export * from "./host";
 export * from "./housekeeping";
 export * from "./owners";
+export * from "./discounts";
+export * from "./add-ons";
+export * from "./guest";

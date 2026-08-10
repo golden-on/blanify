@@ -24,3 +24,6 @@ export * from "./housekeeping-tasks";
 export * from "./owners";
 export * from "./unit-owners";
 export * from "./payout-statements";
+export * from "./discounts";
+export * from "./unit-add-ons";
+export * from "./guest-sessions";

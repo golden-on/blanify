@@ -15,3 +15,6 @@ export * from "./host";
 export * from "./properties";
 export * from "./housekeeping";
 export * from "./owners";
+export * from "./discounts";
+export * from "./add-ons";
+export * from "./guest";

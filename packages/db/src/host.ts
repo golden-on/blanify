@@ -8,6 +8,9 @@ import { properties } from "./schema/properties";
 import { nightlyAvailability } from "./schema/nightly-availability";
 import { payments } from "./schema/payments";
 import { threads } from "./schema/threads";
+import { guestSessions } from "./schema/guest-sessions";
+
+const WEB_ENGINE_URL = process.env.WEB_ENGINE_URL ?? "http://localhost:3001";
 
 export async function listUnitsForAccount(accountId: string) {
   return withTenant(accountId, async (tx) => {
@@ -65,6 +68,7 @@ export interface ReservationDetail {
   payment: typeof payments.$inferSelect | null;
   guestName: string | null;
   channel: string | null;
+  guestPortalUrl: string | null;
 }
 
 export async function getReservationDetail(accountId: string, reservationId: string): Promise<ReservationDetail | null> {
@@ -76,12 +80,16 @@ export async function getReservationDetail(accountId: string, reservationId: str
   return withTenant(accountId, async (tx) => {
     const [payment] = await tx.select().from(payments).where(eq(payments.reservationId, reservationId));
     const [thread] = await tx.select().from(threads).where(eq(threads.reservationId, reservationId));
+    // guest_sessions has no RLS (see schema/guest-sessions.ts) — reservationId here is
+    // already tenant-verified by getReservationById above, so this lookup is safe as-is.
+    const [session] = await tx.select().from(guestSessions).where(eq(guestSessions.reservationId, reservationId));
 
     return {
       reservation,
       payment: payment ?? null,
       guestName: thread?.guestName ?? null,
       channel: thread?.channel ?? null,
+      guestPortalUrl: session ? `${WEB_ENGINE_URL}/guest/${session.token}` : null,
     };
   });
 }

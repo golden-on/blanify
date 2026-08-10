@@ -11,6 +11,7 @@ import { reservations } from "./schema/reservations";
 import { nightlyAvailability } from "./schema/nightly-availability";
 import { webhookEvents } from "./schema/webhook-events";
 import { payments } from "./schema/payments";
+import { guestSessions } from "./schema/guest-sessions";
 
 let reachable = true;
 try {
@@ -65,6 +66,10 @@ describe.skipIf(!reachable)("processStripeWebhookEvent", () => {
       tx.delete(nightlyAvailability).where(eq(nightlyAvailability.unitId, unit.id)),
     );
     await withTenant(account.id, (tx) => tx.delete(payments).where(eq(payments.accountId, account.id)));
+    // processStripeWebhookEvent now also mints a guest_sessions row on success (Phase
+    // 10) — it has no RLS, so this is a plain delete, and it must happen before
+    // reservations to satisfy guest_sessions' FK to reservations.
+    await db.delete(guestSessions).where(eq(guestSessions.accountId, account.id));
     await withTenant(account.id, (tx) => tx.delete(reservations).where(eq(reservations.unitId, unit.id)));
     await withTenant(account.id, (tx) => tx.delete(units).where(eq(units.id, unit.id)));
     await withTenant(account.id, (tx) => tx.delete(properties).where(eq(properties.id, property.id)));

@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { withTenant } from "./tenant-context";
 import { smartLocks } from "./schema/smart-locks";
 import { accessCodes } from "./schema/access-codes";
@@ -32,6 +32,27 @@ export function computeAccessWindow(checkIn: string, checkOut: string): AccessWi
     startsAt: new Date(`${checkIn}T15:00:00Z`),
     endsAt: new Date(`${checkOut}T11:00:00Z`),
   };
+}
+
+// Guest-portal read: returns the active PIN for this reservation's unit lock, or
+// null if there's no lock on the unit or no active (non-revoked/non-expired) code
+// has been provisioned yet.
+export async function getActiveAccessCodeForReservation(accountId: string, unitId: string, reservationId: string) {
+  return withTenant(accountId, async (tx) => {
+    const [lock] = await tx.select().from(smartLocks).where(eq(smartLocks.unitId, unitId));
+    if (!lock) {
+      return null;
+    }
+
+    const [code] = await tx
+      .select()
+      .from(accessCodes)
+      .where(
+        and(eq(accessCodes.reservationId, reservationId), eq(accessCodes.smartLockId, lock.id), eq(accessCodes.status, "active")),
+      );
+
+    return code ?? null;
+  });
 }
 
 export interface RecordAccessCodeInput {

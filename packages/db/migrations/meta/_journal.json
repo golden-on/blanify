@@ -78,6 +78,13 @@
       "when": 1786305520150,
       "tag": "0010_solid_phalanx",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1786316871799,
+      "tag": "0011_spooky_the_phantom",
+      "breakpoints": true
     }
   ]
 }
