@@ -267,6 +267,25 @@ COMMIT;
 
 ---
 
+
+### Phase 12: Calendar Experience & Manual Booking Matrix
+
+* **Rich Calendar Grid Rendering (`apps/web-admin`):**
+  * Display cell nightly rates (`nightly_availability.priceInCents`), column availability badges (`⟳ N free`), and multi-day reservation bars with guest names and channel badges (`Airbnb`, `Booking.com`, `Direct`, `iCal`).
+  * Add visual legend for cell states and inline toggle to switch grid views between Reservations and Housekeeping Tasks.
+
+* **Slide-Over Management Drawers:**
+  * Interactive slide-over panels for "Create Closed Period" (date range + reason comment) and "Create Manual Booking / Quote" (guest details + custom pricing override).
+  * Reservation inspection drawer displaying stay details, payment status, and 1-click Guest Portal URL copy button.
+
+* **Calendar Navigation & Unit Filtering:**
+  * Month/year jump picker, `Today` shortcut button, and multi-unit property filters/sorting.
+
+* **Host Manual Booking Endpoint:**
+  * `POST /api/v1/host/reservations` enabling direct host-created bookings under `withTenant()` RLS isolation.
+
+---
+
 ## Coding Conventions & Guidelines
 
 1. **TypeScript Usage:** Strict mode enabled. No `any` types. Define all payload schemas using `Zod` and derive static types from them.

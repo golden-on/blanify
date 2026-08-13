@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { date, integer, pgEnum, pgPolicy, pgTable, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { date, integer, pgEnum, pgPolicy, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import { accounts } from "./accounts";
 import { units } from "./units";
 import { reservations } from "./reservations";
@@ -24,6 +24,9 @@ export const nightlyAvailability = pgTable(
     status: nightlyAvailabilityStatus("status").notNull().default("available"),
     reservationId: uuid("reservation_id").references(() => reservations.id),
     priceInCents: integer("price_in_cents"),
+    // Set when status is 'blocked' via a host-created closed period; cleared back to
+    // null on unblock.
+    blockReason: text("block_reason"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },

@@ -1,9 +1,10 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { ConcurrencyError } from "@repo/shared-types";
+import { ConcurrencyError, type ReservationChannel } from "@repo/shared-types";
 import type { Transaction } from "./tenant-context";
 import { withTenant } from "./tenant-context";
 import { nightlyAvailability } from "./schema/nightly-availability";
 import { reservations } from "./schema/reservations";
+import { threads } from "./schema/threads";
 
 const LOCK_NOT_AVAILABLE = "55P03";
 
@@ -59,7 +60,7 @@ interface LockedNight {
   status: string;
 }
 
-async function lockNightlyAvailabilityRows(
+export async function lockNightlyAvailabilityRows(
   tx: Transaction,
   unitId: string,
   dates: string[],
@@ -91,6 +92,17 @@ export interface CreateReservationInput {
   unitId: string;
   checkIn: string;
   checkOut: string;
+  // When set, also creates a `threads` row so the calendar/detail views have a
+  // guest name and channel to show — only the host-created manual-booking path
+  // sets these today; webhook-sourced reservations omit them (see Phase 12 plan
+  // Decision 1: nothing else in the codebase creates threads yet).
+  guestName?: string;
+  guestEmail?: string;
+  channel?: ReservationChannel;
+  // Distributed evenly across `dates` (remainder cents on the last night) and
+  // written to each night's priceInCents, overriding whatever rate was set
+  // before. Omit to leave each night's existing priceInCents untouched.
+  totalPriceInCents?: number;
 }
 
 export async function createReservation(input: CreateReservationInput) {
@@ -122,10 +134,34 @@ export async function createReservation(input: CreateReservationInput) {
       throw new Error("Failed to create reservation");
     }
 
-    await tx
-      .update(nightlyAvailability)
-      .set({ status: "booked", reservationId: reservation.id, updatedAt: new Date() })
-      .where(and(eq(nightlyAvailability.unitId, input.unitId), inArray(nightlyAvailability.date, dates)));
+    if (input.totalPriceInCents !== undefined) {
+      const baseInCents = Math.floor(input.totalPriceInCents / dates.length);
+      const remainderInCents = input.totalPriceInCents - baseInCents * dates.length;
+
+      for (let i = 0; i < dates.length; i++) {
+        const priceInCents = baseInCents + (i === dates.length - 1 ? remainderInCents : 0);
+        await tx
+          .update(nightlyAvailability)
+          .set({ status: "booked", reservationId: reservation.id, priceInCents, updatedAt: new Date() })
+          .where(and(eq(nightlyAvailability.unitId, input.unitId), eq(nightlyAvailability.date, dates[i]!)));
+      }
+    } else {
+      await tx
+        .update(nightlyAvailability)
+        .set({ status: "booked", reservationId: reservation.id, updatedAt: new Date() })
+        .where(and(eq(nightlyAvailability.unitId, input.unitId), inArray(nightlyAvailability.date, dates)));
+    }
+
+    if (input.guestName) {
+      await tx.insert(threads).values({
+        accountId: input.accountId,
+        unitId: input.unitId,
+        reservationId: reservation.id,
+        guestName: input.guestName,
+        guestEmail: input.guestEmail,
+        channel: input.channel ?? "direct",
+      });
+    }
 
     return reservation;
   });
@@ -135,6 +171,7 @@ export interface BlockDatesInput {
   accountId: string;
   unitId: string;
   dates: string[];
+  reason?: string;
 }
 
 export async function blockDates(input: BlockDatesInput): Promise<void> {
@@ -156,7 +193,7 @@ export async function blockDates(input: BlockDatesInput): Promise<void> {
 
     await tx
       .update(nightlyAvailability)
-      .set({ status: "blocked", updatedAt: new Date() })
+      .set({ status: "blocked", blockReason: input.reason ?? null, updatedAt: new Date() })
       .where(
         and(eq(nightlyAvailability.unitId, input.unitId), inArray(nightlyAvailability.date, input.dates)),
       );
@@ -175,7 +212,7 @@ export async function unblockDates(input: UnblockDatesInput): Promise<void> {
   await withTenant(input.accountId, async (tx) => {
     await tx
       .update(nightlyAvailability)
-      .set({ status: "available", updatedAt: new Date() })
+      .set({ status: "available", blockReason: null, updatedAt: new Date() })
       .where(
         and(
           eq(nightlyAvailability.unitId, input.unitId),

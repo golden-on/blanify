@@ -1,8 +1,16 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
-import { TenantAccessError, blockDatesRequestSchema, createPropertyRequestSchema, createUnitRequestSchema } from "@repo/shared-types";
+import {
+  ConcurrencyError,
+  TenantAccessError,
+  blockDatesRequestSchema,
+  createPropertyRequestSchema,
+  createReservationRequestSchema,
+  createUnitRequestSchema,
+} from "@repo/shared-types";
 import {
   blockUnitDates,
+  createHostReservation,
   createProperty,
   createUnit,
   getReservationDetail,
@@ -19,6 +27,10 @@ const dateRangeQuerySchema = z.object({
 
 function sendTenantAccessDenied(reply: FastifyReply, err: TenantAccessError) {
   return reply.code(403).send({ error: { code: err.code, message: err.message } });
+}
+
+function sendConcurrencyConflict(reply: FastifyReply, err: ConcurrencyError) {
+  return reply.code(409).send({ error: { code: err.code, message: err.message } });
 }
 
 const hostPreHandler = [requireAuth, requireRole("owner", "manager")];
@@ -78,10 +90,11 @@ export async function registerHostRoutes(app: FastifyInstance) {
     }
 
     try {
-      await blockUnitDates(request.accountId!, params.unitId, bodyResult.data.dates);
+      await blockUnitDates(request.accountId!, params.unitId, bodyResult.data.dates, bodyResult.data.reason);
       return reply.code(200).send({ status: "blocked" });
     } catch (err) {
       if (err instanceof TenantAccessError) return sendTenantAccessDenied(reply, err);
+      if (err instanceof ConcurrencyError) return sendConcurrencyConflict(reply, err);
       throw err;
     }
   });
@@ -98,6 +111,25 @@ export async function registerHostRoutes(app: FastifyInstance) {
       return reply.code(200).send({ status: "unblocked" });
     } catch (err) {
       if (err instanceof TenantAccessError) return sendTenantAccessDenied(reply, err);
+      if (err instanceof ConcurrencyError) return sendConcurrencyConflict(reply, err);
+      throw err;
+    }
+  });
+
+  app.post("/api/v1/host/reservations", { preHandler: hostPreHandler }, async (request, reply) => {
+    const bodyResult = createReservationRequestSchema.safeParse(request.body);
+    if (!bodyResult.success) {
+      return reply.code(400).send({
+        error: { code: "INVALID_PAYLOAD", message: "unitId, checkIn, checkOut, and guestName are required" },
+      });
+    }
+
+    try {
+      const detail = await createHostReservation(request.accountId!, bodyResult.data);
+      return reply.code(201).send(detail);
+    } catch (err) {
+      if (err instanceof TenantAccessError) return sendTenantAccessDenied(reply, err);
+      if (err instanceof ConcurrencyError) return sendConcurrencyConflict(reply, err);
       throw err;
     }
   });

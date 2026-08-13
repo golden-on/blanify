@@ -92,6 +92,16 @@ export async function listTasksForAccount(accountId: string, caller: TaskCaller,
   });
 }
 
+export async function getCleaningTaskForReservation(accountId: string, reservationId: string) {
+  const [task] = await withTenant(accountId, (tx) =>
+    tx
+      .select()
+      .from(housekeepingTasks)
+      .where(and(eq(housekeepingTasks.reservationId, reservationId), eq(housekeepingTasks.taskType, "cleaning"))),
+  );
+  return task ?? null;
+}
+
 export interface CreateTaskInput {
   unitId: string;
   reservationId?: string;

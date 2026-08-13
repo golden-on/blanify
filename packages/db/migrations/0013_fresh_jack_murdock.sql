@@ -1,0 +1,1 @@
+ALTER TABLE "nightly_availability" ADD COLUMN "block_reason" text;
