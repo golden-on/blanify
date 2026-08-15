@@ -113,6 +113,13 @@
       "when": 1786806362377,
       "tag": "0015_public_paper_doll",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1786809521793,
+      "tag": "0016_low_wilson_fisk",
+      "breakpoints": true
     }
   ]
 }

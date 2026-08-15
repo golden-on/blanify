@@ -11,6 +11,7 @@ import { registerInboxWsRoutes } from "./routes/inbox-ws";
 import { registerPricingWebhookRoutes } from "./routes/pricing-webhook";
 import { registerAuthRoutes } from "./routes/auth";
 import { registerHostRoutes } from "./routes/host";
+import { registerReservationRoutes } from "./routes/reservations";
 import { registerTaskRoutes } from "./routes/tasks";
 import { registerOwnerRoutes } from "./routes/owners";
 import { registerGuestRoutes } from "./routes/guest";
@@ -60,6 +61,7 @@ export function buildApp(): FastifyInstance {
   app.register(registerStripeWebhookRoutes);
   app.register(registerAuthRoutes);
   app.register(registerHostRoutes);
+  app.register(registerReservationRoutes);
   app.register(registerTaskRoutes);
   app.register(registerOwnerRoutes);
   app.register(registerGuestRoutes);

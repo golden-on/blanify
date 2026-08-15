@@ -1,17 +1,28 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Sparkles } from "lucide-react";
+import { Bot, Sparkles } from "lucide-react";
 import { useSession } from "@/lib/session";
 import { apiFetch, ApiError, inboxWebSocketUrl } from "@/lib/api";
+
+type ThreadStatus = "open" | "closed" | "archived";
 
 interface Thread {
   id: string;
   guestName: string;
   channel: string;
+  status: ThreadStatus;
   unreadCount: number;
   lastMessagePreview: string | null;
+  hasAiReply: boolean;
 }
+
+const STATUS_TABS: { value: "all" | ThreadStatus; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "open", label: "Open" },
+  { value: "closed", label: "Closed" },
+  { value: "archived", label: "Archived" },
+];
 
 interface Message {
   id: string;
@@ -30,18 +41,24 @@ export default function InboxPage() {
   const [draft, setDraft] = useState("");
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [statusTab, setStatusTab] = useState<"all" | ThreadStatus>("all");
+  const [isTogglingStatus, setIsTogglingStatus] = useState(false);
   const activeThreadIdRef = useRef<string | null>(null);
   activeThreadIdRef.current = activeThreadId;
 
   const loadThreads = useCallback(async () => {
     if (!token) return;
     try {
-      const body = await apiFetch<{ threads: Thread[] }>("/api/v1/inbox/threads", token);
+      const params = new URLSearchParams();
+      if (search.trim()) params.set("search", search.trim());
+      if (statusTab !== "all") params.set("status", statusTab);
+      const body = await apiFetch<{ threads: Thread[] }>(`/api/v1/inbox/threads?${params.toString()}`, token);
       setThreads(body.threads);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load threads");
     }
-  }, [token]);
+  }, [token, search, statusTab]);
 
   const loadMessages = useCallback(
     async (threadId: string) => {
@@ -112,9 +129,48 @@ export default function InboxPage() {
 
   const activeThread = threads.find((t) => t.id === activeThreadId) ?? null;
 
+  async function toggleThreadStatus() {
+    if (!token || !activeThread) return;
+    const nextStatus: ThreadStatus = activeThread.status === "closed" ? "open" : "closed";
+    setIsTogglingStatus(true);
+    try {
+      await apiFetch(`/api/v1/inbox/threads/${activeThread.id}/status`, token, {
+        method: "PATCH",
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      await loadThreads();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to update thread status");
+    } finally {
+      setIsTogglingStatus(false);
+    }
+  }
+
   return (
     <div className="flex h-screen">
-      <aside className="w-72 shrink-0 overflow-y-auto border-r border-neutral-200">
+      <aside className="flex w-72 shrink-0 flex-col overflow-y-auto border-r border-neutral-200">
+        <div className="space-y-2 border-b border-neutral-100 p-3">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search guests..."
+            className="w-full rounded-md border border-neutral-300 p-1.5 text-sm"
+          />
+          <div className="flex gap-1">
+            {STATUS_TABS.map((tab) => (
+              <button
+                key={tab.value}
+                onClick={() => setStatusTab(tab.value)}
+                className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                  statusTab === tab.value ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
         {threads.map((thread) => (
           <button
             key={thread.id}
@@ -124,7 +180,14 @@ export default function InboxPage() {
             }`}
           >
             <div className="flex items-center justify-between">
-              <span className="font-medium">{thread.guestName}</span>
+              <span className="flex items-center gap-1 font-medium">
+                {thread.guestName}
+                {thread.hasAiReply && (
+                  <span className="flex items-center gap-0.5 rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-medium text-violet-700">
+                    <Bot size={10} /> AI
+                  </span>
+                )}
+              </span>
               {thread.unreadCount > 0 && (
                 <span className="rounded-full bg-neutral-900 px-2 py-0.5 text-xs text-white">{thread.unreadCount}</span>
               )}
@@ -142,8 +205,17 @@ export default function InboxPage() {
           <div className="flex flex-1 items-center justify-center text-sm text-neutral-400">Select a conversation</div>
         ) : (
           <>
-            <div className="border-b border-neutral-200 p-3 text-sm font-medium">
-              {activeThread.guestName} <span className="text-neutral-400">via {activeThread.channel}</span>
+            <div className="flex items-center justify-between border-b border-neutral-200 p-3 text-sm font-medium">
+              <span>
+                {activeThread.guestName} <span className="text-neutral-400">via {activeThread.channel}</span>
+              </span>
+              <button
+                onClick={() => void toggleThreadStatus()}
+                disabled={isTogglingStatus}
+                className="rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium hover:bg-neutral-50 disabled:opacity-50"
+              >
+                {activeThread.status === "closed" ? "Reopen" : "Mark as Closed"}
+              </button>
             </div>
             <div className="flex-1 space-y-3 overflow-y-auto p-4">
               {messages.map((message) => (

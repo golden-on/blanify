@@ -1,4 +1,5 @@
-import { asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, or, sql } from "drizzle-orm";
+import type { ThreadStatus } from "@repo/shared-types";
 import { withTenant } from "./tenant-context";
 import { threads } from "./schema/threads";
 import { messages } from "./schema/messages";
@@ -11,9 +12,19 @@ export interface PageParams {
   pageSize: number;
 }
 
-export async function listThreads(accountId: string, { page, pageSize }: PageParams) {
+export interface ListThreadsFilters extends PageParams {
+  search?: string;
+  status?: ThreadStatus;
+}
+
+export async function listThreads(accountId: string, { page, pageSize, search, status }: ListThreadsFilters) {
   return withTenant(accountId, async (tx) => {
     const offset = (page - 1) * pageSize;
+
+    const conditions = [
+      status ? eq(threads.status, status) : undefined,
+      search ? or(sql`${threads.guestName} ilike ${`%${search}%`}`, sql`${threads.guestEmail} ilike ${`%${search}%`}`) : undefined,
+    ].filter((c): c is NonNullable<typeof c> => c !== undefined);
 
     const rows = await tx
       .select({
@@ -23,15 +34,35 @@ export async function listThreads(accountId: string, { page, pageSize }: PagePar
         // extra per-thread round trip, and the aggregate query above can't otherwise
         // single out one specific message's content once messages are joined+grouped.
         lastMessagePreview: sql<string | null>`(select m2.content from messages m2 where m2.thread_id = ${threads.id} order by m2.created_at desc limit 1)`,
+        // True once anything in the codebase actually inserts a message with
+        // senderType 'ai' (nothing does yet — see Phase 15 plan Decision 5).
+        hasAiReply: sql<boolean>`exists (select 1 from messages m3 where m3.thread_id = ${threads.id} and m3.sender_type = 'ai')`,
       })
       .from(threads)
       .leftJoin(messages, eq(messages.threadId, threads.id))
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
       .groupBy(threads.id)
       .orderBy(desc(threads.lastMessageAt))
       .limit(pageSize)
       .offset(offset);
 
-    return rows.map(({ thread, unreadCount, lastMessagePreview }) => ({ ...thread, unreadCount, lastMessagePreview }));
+    return rows.map(({ thread, unreadCount, lastMessagePreview, hasAiReply }) => ({
+      ...thread,
+      unreadCount,
+      lastMessagePreview,
+      hasAiReply,
+    }));
+  });
+}
+
+export async function updateThreadStatus(accountId: string, threadId: string, status: ThreadStatus) {
+  return withTenant(accountId, async (tx) => {
+    const [thread] = await tx
+      .update(threads)
+      .set({ status, updatedAt: new Date() })
+      .where(eq(threads.id, threadId))
+      .returning();
+    return thread ?? null;
   });
 }
 

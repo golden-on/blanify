@@ -143,3 +143,10 @@ export async function getPaymentByReservationId(accountId: string, reservationId
   );
   return payment ?? null;
 }
+
+export async function markPaymentRefunded(accountId: string, paymentId: string) {
+  const [payment] = await withTenant(accountId, (tx) =>
+    tx.update(payments).set({ status: "refunded", updatedAt: new Date() }).where(eq(payments.id, paymentId)).returning(),
+  );
+  return payment ?? null;
+}

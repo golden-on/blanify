@@ -17,6 +17,7 @@ describe.skipIf(!reachable)("Inbox REST routes", () => {
   let property: { id: string };
   let unit: { id: string };
   let thread: { id: string };
+  let threadTwo: { id: string };
   let token: string;
   let otherToken: string;
 
@@ -46,6 +47,14 @@ describe.skipIf(!reachable)("Inbox REST routes", () => {
       return row!;
     });
 
+    threadTwo = await withTenant(account.id, async (tx) => {
+      const [row] = await tx
+        .insert(threads)
+        .values({ accountId: account.id, unitId: unit.id, guestName: "Archie Vado", guestEmail: "archie@example.com", channel: "booking" })
+        .returning();
+      return row!;
+    });
+
     await withTenant(account.id, (tx) =>
       tx.insert(messages).values([
         { accountId: account.id, threadId: thread.id, senderType: "guest", content: "Hi there", isRead: true },
@@ -57,6 +66,7 @@ describe.skipIf(!reachable)("Inbox REST routes", () => {
   afterAll(async () => {
     await withTenant(account.id, (tx) => tx.delete(messages).where(eq(messages.threadId, thread.id)));
     await withTenant(account.id, (tx) => tx.delete(threads).where(eq(threads.id, thread.id)));
+    await withTenant(account.id, (tx) => tx.delete(threads).where(eq(threads.id, threadTwo.id)));
     await withTenant(account.id, (tx) => tx.delete(units).where(eq(units.id, unit.id)));
     await withTenant(account.id, (tx) => tx.delete(properties).where(eq(properties.id, property.id)));
     await db.delete(accounts).where(eq(accounts.id, account.id));
@@ -80,8 +90,12 @@ describe.skipIf(!reachable)("Inbox REST routes", () => {
 
     expect(response.statusCode).toBe(200);
     const body = response.json();
-    expect(body.threads).toHaveLength(1);
-    expect(body.threads[0]).toMatchObject({ id: thread.id, guestName: "Guest One", unreadCount: 1 });
+    expect(body.threads).toHaveLength(2);
+    expect(body.threads.find((t: { id: string }) => t.id === thread.id)).toMatchObject({
+      id: thread.id,
+      guestName: "Guest One",
+      unreadCount: 1,
+    });
 
     await app.close();
   }, 20000);
@@ -129,6 +143,89 @@ describe.skipIf(!reachable)("Inbox REST routes", () => {
     expect(historyResponse.statusCode).toBe(200);
     const historyBody = historyResponse.json() as { messages: Array<{ content: string }> };
     expect(historyBody.messages.some((m) => m.content === "Thanks for reaching out!")).toBe(true);
+
+    await app.close();
+  }, 20000);
+
+  it("filters threads by search and status", async () => {
+    const app = buildApp();
+
+    const searchResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/inbox/threads?search=Archie",
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(searchResponse.statusCode).toBe(200);
+    expect(searchResponse.json().threads).toHaveLength(1);
+    expect(searchResponse.json().threads[0]).toMatchObject({ id: threadTwo.id });
+
+    const emailSearchResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/inbox/threads?search=archie%40example.com",
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(emailSearchResponse.json().threads).toHaveLength(1);
+
+    const openStatusResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/inbox/threads?status=open",
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(openStatusResponse.json().threads).toHaveLength(2);
+
+    const closedStatusResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/inbox/threads?status=closed",
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(closedStatusResponse.json().threads).toEqual([]);
+
+    await app.close();
+  }, 20000);
+
+  it("updates thread status via PATCH, rejects an invalid value, and isolates cross-tenant access", async () => {
+    const app = buildApp();
+
+    const patchResponse = await app.inject({
+      method: "PATCH",
+      url: `/api/v1/inbox/threads/${threadTwo.id}/status`,
+      headers: { authorization: `Bearer ${token}` },
+      payload: { status: "closed" },
+    });
+    expect(patchResponse.statusCode).toBe(200);
+    expect(patchResponse.json().thread).toMatchObject({ id: threadTwo.id, status: "closed" });
+
+    const closedListResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/inbox/threads?status=closed",
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(closedListResponse.json().threads).toHaveLength(1);
+    expect(closedListResponse.json().threads[0]).toMatchObject({ id: threadTwo.id });
+
+    const invalidResponse = await app.inject({
+      method: "PATCH",
+      url: `/api/v1/inbox/threads/${threadTwo.id}/status`,
+      headers: { authorization: `Bearer ${token}` },
+      payload: { status: "bogus" },
+    });
+    expect(invalidResponse.statusCode).toBe(400);
+
+    // Reopen it so it doesn't bleed into the earlier status-filter test if suites re-run.
+    await app.inject({
+      method: "PATCH",
+      url: `/api/v1/inbox/threads/${threadTwo.id}/status`,
+      headers: { authorization: `Bearer ${token}` },
+      payload: { status: "open" },
+    });
+
+    const crossTenantResponse = await app.inject({
+      method: "PATCH",
+      url: `/api/v1/inbox/threads/${threadTwo.id}/status`,
+      headers: { authorization: `Bearer ${otherToken}` },
+      payload: { status: "archived" },
+    });
+    expect(crossTenantResponse.statusCode).toBe(404);
 
     await app.close();
   }, 20000);

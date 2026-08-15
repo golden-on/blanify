@@ -8,6 +8,7 @@ import {
   createReservationRequestSchema,
   createTaxRuleRequestSchema,
   createUnitRequestSchema,
+  listReservationsQuerySchema,
   updateUnitRequestSchema,
 } from "@repo/shared-types";
 import {
@@ -19,6 +20,7 @@ import {
   deleteTaxRule,
   getReservationDetail,
   getUnitCalendar,
+  listReservationsForAccount,
   listTaxRulesForAccount,
   listUnitsForAccount,
   unblockUnitDates,
@@ -136,6 +138,16 @@ export async function registerHostRoutes(app: FastifyInstance) {
       if (err instanceof ConcurrencyError) return sendConcurrencyConflict(reply, err);
       throw err;
     }
+  });
+
+  app.get("/api/v1/host/reservations", { preHandler: hostPreHandler }, async (request, reply) => {
+    const queryResult = listReservationsQuerySchema.safeParse(request.query);
+    if (!queryResult.success) {
+      return reply.code(400).send({ error: { code: "INVALID_QUERY", message: "Invalid reservation filter parameters" } });
+    }
+
+    const reservations = await listReservationsForAccount(request.accountId!, queryResult.data);
+    return reply.code(200).send({ reservations, page: queryResult.data.page, pageSize: queryResult.data.pageSize });
   });
 
   app.post("/api/v1/host/reservations", { preHandler: hostPreHandler }, async (request, reply) => {

@@ -308,9 +308,23 @@ COMMIT;
 * **Visual Website Builder (`apps/web-admin/app/website`):**
   * Side-by-side editor for Phase 4 dynamic booking sites (`GET|PATCH /api/v1/host/site`).
   * Customization of hero titles, theme colors, featured units, custom domain routing, and instant live preview.
-
-  
+ 
 ---
+
+### Phase 15: Reservations Hub & Inbox Intelligence
+
+* **Dedicated Reservations Hub (`apps/web-admin/app/reservations`):**
+  * Searchable and filterable reservations table with unit, status (`confirmed`, `cancelled`, `checked_in`, `checked_out`), and date filters plus client-side CSV export.
+  * Extended `GET /api/v1/host/reservations` returning itemized financial breakdowns (base rate, cleaning fees, taxes, add-ons, paid vs. due balance).
+  * `POST /api/v1/host/reservations/:id/cancel` route to unblock nightly availability rows, mark reservations as cancelled, and process Stripe refunds.
+
+* **Inbox Intelligence & Workflows (`apps/web-admin/app/inbox`):**
+  * Added `status` column (`open`, `closed`, `archived`) to `threads` with `PATCH /api/v1/host/threads/:id/status`.
+  * Keyword search and status filter parameters on `GET /api/v1/host/threads`.
+  * AI auto-reply badge indicators for threads handled by the automated responder driver.
+
+---
+
 
 ## Coding Conventions & Guidelines
 

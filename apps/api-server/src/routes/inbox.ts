@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
-import { inboxPaginationQuerySchema, sendMessageRequestSchema } from "@repo/shared-types";
-import { createHostMessage, getThreadContext, getThreadMessages, listThreads } from "@repo/db";
+import { inboxPaginationQuerySchema, listThreadsQuerySchema, sendMessageRequestSchema, updateThreadStatusSchema } from "@repo/shared-types";
+import { createHostMessage, getThreadContext, getThreadMessages, listThreads, updateThreadStatus } from "@repo/db";
 import { llmDriver as defaultLlmDriver, type LLMDriver } from "../ai/llm-client";
 import { publishInboxMessage } from "../realtime";
 import { requireAuth, requireRole } from "../auth";
@@ -19,14 +19,29 @@ export async function registerInboxRoutes(app: FastifyInstance, opts: InboxRoute
   const llmDriver = opts.llmDriver ?? defaultLlmDriver;
 
   app.get("/api/v1/inbox/threads", { preHandler: inboxPreHandler }, async (request, reply) => {
-    const queryResult = inboxPaginationQuerySchema.safeParse(request.query);
+    const queryResult = listThreadsQuerySchema.safeParse(request.query);
     if (!queryResult.success) {
       return reply.code(400).send({ error: { code: "INVALID_QUERY", message: "Invalid pagination parameters" } });
     }
-    const { page, pageSize } = queryResult.data;
+    const { page, pageSize, search, status } = queryResult.data;
 
-    const threads = await listThreads(request.accountId!, { page, pageSize });
+    const threads = await listThreads(request.accountId!, { page, pageSize, search, status });
     return reply.code(200).send({ threads, page, pageSize });
+  });
+
+  app.patch("/api/v1/inbox/threads/:threadId/status", { preHandler: inboxPreHandler }, async (request, reply) => {
+    const params = request.params as { threadId: string };
+    const bodyResult = updateThreadStatusSchema.safeParse(request.body);
+    if (!bodyResult.success) {
+      return reply.code(400).send({ error: { code: "INVALID_PAYLOAD", message: "status must be one of open, closed, archived" } });
+    }
+
+    const thread = await updateThreadStatus(request.accountId!, params.threadId, bodyResult.data.status);
+    if (!thread) {
+      return reply.code(404).send({ error: { code: "THREAD_NOT_FOUND", message: `No thread found for id ${params.threadId}` } });
+    }
+
+    return reply.code(200).send({ thread });
   });
 
   app.get("/api/v1/inbox/threads/:threadId/messages", { preHandler: inboxPreHandler }, async (request, reply) => {

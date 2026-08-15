@@ -400,4 +400,100 @@ describe.skipIf(!reachable)("Host routes", () => {
 
     await app.close();
   }, 20000);
+
+  it("lists reservations with search, status, unit, and date-range filters, and tenant isolation", async () => {
+    interface ReservationRow {
+      id: string;
+      unitName: string | null;
+      guestName: string | null;
+      status: string;
+      totalInCents: number;
+    }
+
+    const app = buildApp();
+
+    const createResponse = await app.inject({
+      method: "POST",
+      url: "/api/v1/host/reservations",
+      headers: { authorization: `Bearer ${token}` },
+      payload: {
+        unitId: unit.id,
+        checkIn: "2030-07-01",
+        checkOut: "2030-07-03",
+        guestName: "List Filter Guest",
+        guestEmail: "listfilter@example.com",
+        channel: "direct",
+        totalPriceInCents: 20000,
+      },
+    });
+    expect(createResponse.statusCode).toBe(201);
+    const reservationId = createResponse.json().reservation.id as string;
+
+    const listResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/host/reservations",
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(listResponse.statusCode).toBe(200);
+    const rows = listResponse.json().reservations as ReservationRow[];
+    // unitName is intentionally not asserted to a literal here — an earlier test in this
+    // file renames the shared `unit` fixture to "Renamed Unit", and that mutation is
+    // expected to still be in effect by the time this test runs.
+    expect(rows.find((r) => r.id === reservationId)).toMatchObject({
+      guestName: "List Filter Guest",
+      status: "confirmed",
+      totalInCents: 20000,
+    });
+
+    const searchResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/host/reservations?search=Filter%20Guest",
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect((searchResponse.json().reservations as ReservationRow[]).map((r) => r.id)).toContain(reservationId);
+
+    const noMatchSearchResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/host/reservations?search=Nonexistent%20Guest",
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(noMatchSearchResponse.json().reservations).toEqual([]);
+
+    const unitFilterResponse = await app.inject({
+      method: "GET",
+      url: `/api/v1/host/reservations?unitId=${unit.id}`,
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect((unitFilterResponse.json().reservations as ReservationRow[]).map((r) => r.id)).toContain(reservationId);
+
+    const inRangeResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/host/reservations?startDate=2030-07-01&endDate=2030-07-01",
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect((inRangeResponse.json().reservations as ReservationRow[]).map((r) => r.id)).toContain(reservationId);
+
+    const outOfRangeResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/host/reservations?startDate=2031-01-01&endDate=2031-01-31",
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect((outOfRangeResponse.json().reservations as ReservationRow[]).map((r) => r.id)).not.toContain(reservationId);
+
+    const statusFilterResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/host/reservations?status=cancelled",
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect((statusFilterResponse.json().reservations as ReservationRow[]).map((r) => r.id)).not.toContain(reservationId);
+
+    const crossTenantResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/host/reservations",
+      headers: { authorization: `Bearer ${otherToken}` },
+    });
+    expect(crossTenantResponse.json().reservations).toEqual([]);
+
+    await app.close();
+  }, 20000);
 });

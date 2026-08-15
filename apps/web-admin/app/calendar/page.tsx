@@ -385,7 +385,17 @@ export default function CalendarPage() {
         </div>
       )}
 
-      {detail && <ReservationDetailDrawer detail={detail} onClose={() => setDetail(null)} />}
+      {detail && (
+        <ReservationDetailDrawer
+          detail={detail}
+          token={token}
+          onClose={() => setDetail(null)}
+          onCancelled={() => {
+            setDetail(null);
+            void loadCalendar();
+          }}
+        />
+      )}
 
       {closedPeriodDraft && token && (
         <ClosedPeriodDrawer

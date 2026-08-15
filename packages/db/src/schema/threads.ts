@@ -17,6 +17,7 @@ export const threads = pgTable(
     guestEmail: text("guest_email"),
     guestPhone: text("guest_phone"),
     channel: text("channel").notNull(),
+    status: text("status").notNull().default("open"),
     lastMessageAt: timestamp("last_message_at").defaultNow().notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
