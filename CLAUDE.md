@@ -286,6 +286,19 @@ COMMIT;
 
 ---
 
+### Phase 13: Property Management Workspace & System Settings
+
+* **Unit Administration Workspace (`apps/web-admin/app/units/[id]`):**
+  * Multi-tab editing interface for unit metadata: Overview, Room/Bed Configurations, Categorized Amenities, Photo Gallery ordering, and Pricing/Policy defaults.
+  * Schema support via `PATCH /api/v1/host/units/:id` updating unit `roomsConfig`, `amenities`, `photos`, and `policies` jsonb fields.
+
+* **System Settings Hub (`apps/web-admin/app/settings`):**
+  * Tax Rules UI mapping to Phase 11 backend logic via `GET|POST|DELETE /api/v1/host/tax-rules`.
+  * Security deposit pre-authorization policy controls and global cancellation rules setup.
+  * Smart lock integration overview and PIN buffer settings.
+
+---
+
 ## Coding Conventions & Guidelines
 
 1. **TypeScript Usage:** Strict mode enabled. No `any` types. Define all payload schemas using `Zod` and derive static types from them.

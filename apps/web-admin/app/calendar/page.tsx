@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { CalendarDays, Plus } from "lucide-react";
 import { useSession } from "@/lib/session";
 import { apiFetch, ApiError } from "@/lib/api";
@@ -305,7 +306,9 @@ export default function CalendarPage() {
             {filteredUnits.map((unit) => (
               <div key={unit.id} className="grid items-center border-t border-neutral-100" style={{ gridTemplateColumns: GRID_TEMPLATE }}>
                 <div className="sticky left-0 z-10 bg-white p-2">
-                  <div className="text-sm font-medium">{unit.name}</div>
+                  <Link href={`/units/${unit.id}`} className="text-sm font-medium hover:underline">
+                    {unit.name}
+                  </Link>
                   <div className="text-xs text-neutral-400">{unit.propertyName}</div>
                 </div>
 

@@ -6,17 +6,23 @@ import {
   blockDatesRequestSchema,
   createPropertyRequestSchema,
   createReservationRequestSchema,
+  createTaxRuleRequestSchema,
   createUnitRequestSchema,
+  updateUnitRequestSchema,
 } from "@repo/shared-types";
 import {
   blockUnitDates,
   createHostReservation,
   createProperty,
+  createTaxRule,
   createUnit,
+  deleteTaxRule,
   getReservationDetail,
   getUnitCalendar,
+  listTaxRulesForAccount,
   listUnitsForAccount,
   unblockUnitDates,
+  updateUnit,
 } from "@repo/db";
 import { requireAuth, requireRole } from "../auth";
 
@@ -64,6 +70,22 @@ export async function registerHostRoutes(app: FastifyInstance) {
   app.get("/api/v1/host/units", { preHandler: hostPreHandler }, async (request, reply) => {
     const units = await listUnitsForAccount(request.accountId!);
     return reply.code(200).send({ units });
+  });
+
+  app.patch("/api/v1/host/units/:unitId", { preHandler: hostPreHandler }, async (request, reply) => {
+    const params = request.params as { unitId: string };
+    const bodyResult = updateUnitRequestSchema.safeParse(request.body);
+    if (!bodyResult.success) {
+      return reply.code(400).send({ error: { code: "INVALID_PAYLOAD", message: "Invalid unit update payload" } });
+    }
+
+    try {
+      const unit = await updateUnit(request.accountId!, params.unitId, bodyResult.data);
+      return reply.code(200).send({ unit });
+    } catch (err) {
+      if (err instanceof TenantAccessError) return sendTenantAccessDenied(reply, err);
+      throw err;
+    }
   });
 
   app.get("/api/v1/host/units/:unitId/calendar", { preHandler: hostPreHandler }, async (request, reply) => {
@@ -142,5 +164,28 @@ export async function registerHostRoutes(app: FastifyInstance) {
     }
 
     return reply.code(200).send(detail);
+  });
+
+  app.get("/api/v1/host/tax-rules", { preHandler: hostPreHandler }, async (request, reply) => {
+    const taxRules = await listTaxRulesForAccount(request.accountId!);
+    return reply.code(200).send({ taxRules });
+  });
+
+  app.post("/api/v1/host/tax-rules", { preHandler: hostPreHandler }, async (request, reply) => {
+    const bodyResult = createTaxRuleRequestSchema.safeParse(request.body);
+    if (!bodyResult.success) {
+      return reply.code(400).send({
+        error: { code: "INVALID_PAYLOAD", message: "jurisdiction, taxType, rateType, and rateValue are required" },
+      });
+    }
+
+    const taxRule = await createTaxRule(request.accountId!, bodyResult.data);
+    return reply.code(201).send({ taxRule });
+  });
+
+  app.delete("/api/v1/host/tax-rules/:taxRuleId", { preHandler: hostPreHandler }, async (request, reply) => {
+    const params = request.params as { taxRuleId: string };
+    await deleteTaxRule(request.accountId!, params.taxRuleId);
+    return reply.code(204).send();
   });
 }

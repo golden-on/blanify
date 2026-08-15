@@ -5,11 +5,23 @@ import { accessCodes } from "./schema/access-codes";
 import { reservations } from "./schema/reservations";
 import { threads } from "./schema/threads";
 import { messages } from "./schema/messages";
+import { units } from "./schema/units";
 
 export async function getSmartLockForUnit(accountId: string, unitId: string) {
   return withTenant(accountId, async (tx) => {
     const [row] = await tx.select().from(smartLocks).where(eq(smartLocks.unitId, unitId));
     return row;
+  });
+}
+
+export async function listSmartLocksForAccount(accountId: string) {
+  return withTenant(accountId, async (tx) => {
+    const rows = await tx
+      .select({ lock: smartLocks, unitName: units.name })
+      .from(smartLocks)
+      .innerJoin(units, eq(units.id, smartLocks.unitId));
+
+    return rows.map(({ lock, unitName }) => ({ ...lock, unitName }));
   });
 }
 

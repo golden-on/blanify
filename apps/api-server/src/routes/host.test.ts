@@ -176,6 +176,120 @@ describe.skipIf(!reachable)("Host routes", () => {
     expect(reservationResponse.statusCode).toBe(403);
     expect(reservationResponse.json().error.code).toBe("FORBIDDEN");
 
+    const patchResponse = await app.inject({
+      method: "PATCH",
+      url: `/api/v1/host/units/${unit.id}`,
+      headers: { authorization: `Bearer ${cleanerToken}` },
+      payload: { name: "Should Not Rename" },
+    });
+    expect(patchResponse.statusCode).toBe(403);
+    expect(patchResponse.json().error.code).toBe("FORBIDDEN");
+
+    const taxRuleResponse = await app.inject({
+      method: "POST",
+      url: "/api/v1/host/tax-rules",
+      headers: { authorization: `Bearer ${cleanerToken}` },
+      payload: { jurisdiction: "Nowhere", taxType: "vat", rateType: "percentage", rateValue: 0.1 },
+    });
+    expect(taxRuleResponse.statusCode).toBe(403);
+    expect(taxRuleResponse.json().error.code).toBe("FORBIDDEN");
+
+    await app.close();
+  }, 20000);
+
+  it("updates unit metadata under withTenant, and rejects a cross-tenant PATCH", async () => {
+    const app = buildApp();
+
+    const patchResponse = await app.inject({
+      method: "PATCH",
+      url: `/api/v1/host/units/${unit.id}`,
+      headers: { authorization: `Bearer ${token}` },
+      payload: {
+        name: "Renamed Unit",
+        roomsConfig: { guests: 4, bedrooms: 2, bathrooms: 1, beds: [{ type: "queen", count: 2 }] },
+        amenities: ["wifi", "kitchen"],
+        photos: [{ url: "https://example.com/photo.jpg", caption: "Living room" }],
+        policies: { description: "Cozy unit", cleaningFeeInCents: 5000, baseRateInCents: 15000, checkInTime: "15:00", checkOutTime: "11:00" },
+      },
+    });
+    expect(patchResponse.statusCode).toBe(200);
+    expect(patchResponse.json().unit).toMatchObject({
+      name: "Renamed Unit",
+      roomsConfig: { guests: 4, bedrooms: 2, bathrooms: 1, beds: [{ type: "queen", count: 2 }] },
+      amenities: ["wifi", "kitchen"],
+      photos: [{ url: "https://example.com/photo.jpg", caption: "Living room" }],
+      policies: { description: "Cozy unit", cleaningFeeInCents: 5000, baseRateInCents: 15000, checkInTime: "15:00", checkOutTime: "11:00" },
+    });
+
+    const crossTenantPatch = await app.inject({
+      method: "PATCH",
+      url: `/api/v1/host/units/${unit.id}`,
+      headers: { authorization: `Bearer ${otherToken}` },
+      payload: { name: "Squatted Rename" },
+    });
+    expect(crossTenantPatch.statusCode).toBe(403);
+    expect(crossTenantPatch.json().error.code).toBe("TENANT_ACCESS_DENIED");
+
+    await app.close();
+  }, 20000);
+
+  it("creates, lists, and deletes tax rules under tenant isolation", async () => {
+    const app = buildApp();
+
+    const createResponse = await app.inject({
+      method: "POST",
+      url: "/api/v1/host/tax-rules",
+      headers: { authorization: `Bearer ${token}` },
+      payload: { jurisdiction: "California", taxType: "sales_tax", rateType: "percentage", rateValue: 0.08 },
+    });
+    expect(createResponse.statusCode).toBe(201);
+    const taxRuleId = createResponse.json().taxRule.id as string;
+
+    const listResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/host/tax-rules",
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(listResponse.statusCode).toBe(200);
+    expect(listResponse.json().taxRules).toContainEqual(expect.objectContaining({ id: taxRuleId, jurisdiction: "California" }));
+
+    // A different tenant must never see or be able to delete this tenant's tax rule.
+    const crossTenantList = await app.inject({
+      method: "GET",
+      url: "/api/v1/host/tax-rules",
+      headers: { authorization: `Bearer ${otherToken}` },
+    });
+    expect(crossTenantList.statusCode).toBe(200);
+    expect(crossTenantList.json().taxRules).toEqual([]);
+
+    const crossTenantDelete = await app.inject({
+      method: "DELETE",
+      url: `/api/v1/host/tax-rules/${taxRuleId}`,
+      headers: { authorization: `Bearer ${otherToken}` },
+    });
+    expect(crossTenantDelete.statusCode).toBe(204);
+
+    const stillThereResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/host/tax-rules",
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(stillThereResponse.json().taxRules).toContainEqual(expect.objectContaining({ id: taxRuleId }));
+
+    const deleteResponse = await app.inject({
+      method: "DELETE",
+      url: `/api/v1/host/tax-rules/${taxRuleId}`,
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(deleteResponse.statusCode).toBe(204);
+
+    const finalListResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/host/tax-rules",
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(finalListResponse.json().taxRules).toEqual([]);
+
     await app.close();
   }, 20000);
 

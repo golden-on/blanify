@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
-import { pgPolicy, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { jsonb, pgPolicy, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import type { RoomConfig, UnitPhoto, UnitPolicies } from "@repo/shared-types";
 import { accounts } from "./accounts";
 import { properties } from "./properties";
 
@@ -15,6 +16,10 @@ export const units = pgTable(
       .references(() => properties.id),
     name: text("name").notNull(),
     checkInInstructions: text("check_in_instructions"),
+    roomsConfig: jsonb("rooms_config").$type<RoomConfig>(),
+    amenities: jsonb("amenities").$type<string[]>(),
+    photos: jsonb("photos").$type<UnitPhoto[]>(),
+    policies: jsonb("policies").$type<UnitPolicies>(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [

@@ -1,5 +1,5 @@
 import { and, eq, gte, lte } from "drizzle-orm";
-import { TenantAccessError, type ReservationChannel } from "@repo/shared-types";
+import { TenantAccessError, type ReservationChannel, type UpdateUnitRequest } from "@repo/shared-types";
 import { db } from "./client";
 import { withTenant } from "./tenant-context";
 import { getReservationById } from "./smart-locks";
@@ -17,11 +17,11 @@ const WEB_ENGINE_URL = process.env.WEB_ENGINE_URL ?? "http://localhost:3001";
 export async function listUnitsForAccount(accountId: string) {
   return withTenant(accountId, async (tx) => {
     const rows = await tx
-      .select({ unit: units, propertyName: properties.name })
+      .select({ unit: units, propertyName: properties.name, propertyAddress: properties.address })
       .from(units)
       .innerJoin(properties, eq(properties.id, units.propertyId));
 
-    return rows.map(({ unit, propertyName }) => ({ ...unit, propertyName }));
+    return rows.map(({ unit, propertyName, propertyAddress }) => ({ ...unit, propertyName, propertyAddress }));
   });
 }
 
@@ -36,6 +36,30 @@ async function assertUnitBelongsToAccount(accountId: string, unitId: string): Pr
   if (!unit) {
     throw new TenantAccessError(`Unit ${unitId} does not belong to this account`);
   }
+}
+
+export async function updateUnit(accountId: string, unitId: string, input: UpdateUnitRequest) {
+  await assertUnitBelongsToAccount(accountId, unitId);
+
+  return withTenant(accountId, async (tx) => {
+    const [unit] = await tx
+      .update(units)
+      .set({
+        ...(input.name !== undefined && { name: input.name }),
+        ...(input.checkInInstructions !== undefined && { checkInInstructions: input.checkInInstructions }),
+        ...(input.roomsConfig !== undefined && { roomsConfig: input.roomsConfig }),
+        ...(input.amenities !== undefined && { amenities: input.amenities }),
+        ...(input.photos !== undefined && { photos: input.photos }),
+        ...(input.policies !== undefined && { policies: input.policies }),
+      })
+      .where(eq(units.id, unitId))
+      .returning();
+
+    if (!unit) {
+      throw new Error("Failed to update unit");
+    }
+    return unit;
+  });
 }
 
 export interface CalendarNight {
