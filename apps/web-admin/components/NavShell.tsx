@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { BarChart3, CalendarDays, ClipboardList, Inbox, LogOut, Percent, PlusCircle, Settings, Users } from "lucide-react";
+import { BarChart3, CalendarDays, ClipboardList, Globe, Inbox, LogOut, Percent, PlusCircle, Rss, Settings, Users } from "lucide-react";
 import { useSession, type UserRole } from "@/lib/session";
 
 const NAV_ITEMS: { href: string; label: string; icon: typeof CalendarDays; roles?: UserRole[] }[] = [
@@ -13,6 +13,8 @@ const NAV_ITEMS: { href: string; label: string; icon: typeof CalendarDays; roles
   { href: "/owners", label: "Owners", icon: Users, roles: ["owner", "manager"] },
   { href: "/discounts", label: "Discounts", icon: Percent, roles: ["owner", "manager"] },
   { href: "/add-ons", label: "Add-Ons", icon: PlusCircle, roles: ["owner", "manager"] },
+  { href: "/channels", label: "Channels", icon: Rss, roles: ["owner", "manager"] },
+  { href: "/website", label: "Website", icon: Globe, roles: ["owner", "manager"] },
   { href: "/analytics", label: "Analytics", icon: BarChart3, roles: ["owner", "manager"] },
   { href: "/settings", label: "Settings", icon: Settings, roles: ["owner", "manager"] },
 ];

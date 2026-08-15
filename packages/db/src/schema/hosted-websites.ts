@@ -8,6 +8,7 @@ export const hostedWebsites = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     accountId: uuid("account_id")
       .notNull()
+      .unique()
       .references(() => accounts.id),
     subdomain: text("subdomain").notNull().unique(),
     customDomain: text("custom_domain").unique(),

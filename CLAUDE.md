@@ -299,6 +299,19 @@ COMMIT;
 
 ---
 
+### Phase 14: Channel Manager Hub & Visual Website Builder
+
+* **Channel Manager Hub (`apps/web-admin/app/channels`):**
+  * Display OTA connection health, last sync status, and manual sync triggers (`POST /api/v1/host/channels/sync`).
+  * Inbound/Outbound iCal feed management per unit (`GET|POST|DELETE /api/v1/host/channels/ical-feeds`).
+
+* **Visual Website Builder (`apps/web-admin/app/website`):**
+  * Side-by-side editor for Phase 4 dynamic booking sites (`GET|PATCH /api/v1/host/site`).
+  * Customization of hero titles, theme colors, featured units, custom domain routing, and instant live preview.
+
+  
+---
+
 ## Coding Conventions & Guidelines
 
 1. **TypeScript Usage:** Strict mode enabled. No `any` types. Define all payload schemas using `Zod` and derive static types from them.

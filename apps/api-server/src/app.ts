@@ -19,6 +19,8 @@ import { registerAddOnRoutes } from "./routes/add-ons";
 import { registerDepositClaimRoutes } from "./routes/deposit-claims";
 import { registerAnalyticsRoutes } from "./routes/analytics";
 import { registerSettingsRoutes } from "./routes/settings";
+import { registerSiteRoutes } from "./routes/site";
+import { registerChannelRoutes } from "./routes/channels";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -66,6 +68,8 @@ export function buildApp(): FastifyInstance {
   app.register(registerDepositClaimRoutes);
   app.register(registerAnalyticsRoutes);
   app.register(registerSettingsRoutes);
+  app.register(registerSiteRoutes);
+  app.register(registerChannelRoutes);
   app.register(registerInboxRoutes);
   app.register(registerInboxWsRoutes);
   app.register(registerPricingWebhookRoutes);

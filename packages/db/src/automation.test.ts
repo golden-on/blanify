@@ -12,6 +12,7 @@ import { threads } from "./schema/threads";
 import { messages } from "./schema/messages";
 import { automationRules } from "./schema/automation-rules";
 import { automationDispatches } from "./schema/automation-dispatches";
+import { housekeepingTasks } from "./schema/housekeeping-tasks";
 
 describe("renderTemplate", () => {
   it("substitutes known variables", () => {
@@ -176,6 +177,7 @@ describe.skipIf(!reachable)("evaluateAutomationRules", () => {
     await withTenant(account.id, (tx) => tx.delete(automationDispatches).where(eq(automationDispatches.accountId, account.id)));
     await withTenant(account.id, (tx) => tx.delete(messages).where(eq(messages.accountId, account.id)));
     await withTenant(account.id, (tx) => tx.delete(threads).where(eq(threads.accountId, account.id)));
+    await withTenant(account.id, (tx) => tx.delete(housekeepingTasks).where(eq(housekeepingTasks.accountId, account.id)));
     await withTenant(account.id, (tx) => tx.delete(reservations).where(eq(reservations.accountId, account.id)));
     await withTenant(account.id, (tx) => tx.delete(automationRules).where(eq(automationRules.accountId, account.id)));
     await withTenant(account.id, (tx) => tx.delete(units).where(eq(units.id, unit.id)));

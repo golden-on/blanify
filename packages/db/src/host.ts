@@ -31,7 +31,7 @@ export async function listUnitsForAccount(accountId: string) {
 // a URL a caller controls, so without this check an authenticated tenant could target
 // another tenant's unitId and silently create a nightly_availability row for it under
 // their own accountId, effectively squatting on that unit/date pair.
-async function assertUnitBelongsToAccount(accountId: string, unitId: string): Promise<void> {
+export async function assertUnitBelongsToAccount(accountId: string, unitId: string): Promise<void> {
   const [unit] = await withTenant(accountId, (tx) => tx.select({ id: units.id }).from(units).where(eq(units.id, unitId)));
   if (!unit) {
     throw new TenantAccessError(`Unit ${unitId} does not belong to this account`);

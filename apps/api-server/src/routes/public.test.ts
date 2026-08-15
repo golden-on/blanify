@@ -21,18 +21,25 @@ try {
 }
 
 describe.skipIf(!reachable)("GET /api/v1/public/websites/resolve", () => {
-  let account: { id: string };
+  // hosted_websites.accountId is unique (one site per account, Phase 14) — this suite
+  // tests three distinct domain-resolution scenarios, so each gets its own account
+  // rather than sharing one account across three sites.
+  let subdomainAccount: { id: string };
+  let customDomainAccount: { id: string };
+  let unpublishedAccount: { id: string };
   let publishedSubdomainSite: { id: string };
   let publishedCustomDomainSite: { id: string };
 
   beforeAll(async () => {
-    account = (await db.insert(accounts).values({ name: "Public Routes Test Tenant" }).returning())[0]!;
+    subdomainAccount = (await db.insert(accounts).values({ name: "Public Routes Test Tenant (subdomain)" }).returning())[0]!;
+    customDomainAccount = (await db.insert(accounts).values({ name: "Public Routes Test Tenant (custom domain)" }).returning())[0]!;
+    unpublishedAccount = (await db.insert(accounts).values({ name: "Public Routes Test Tenant (unpublished)" }).returning())[0]!;
 
-    publishedSubdomainSite = await withTenant(account.id, async (tx) => {
+    publishedSubdomainSite = await withTenant(subdomainAccount.id, async (tx) => {
       const [row] = await tx
         .insert(hostedWebsites)
         .values({
-          accountId: account.id,
+          accountId: subdomainAccount.id,
           subdomain: "public-routes-test-subdomain",
           themeConfig: { primaryColor: "#111111", fontFamily: "Inter" },
           isPublished: true,
@@ -41,11 +48,11 @@ describe.skipIf(!reachable)("GET /api/v1/public/websites/resolve", () => {
       return row!;
     });
 
-    publishedCustomDomainSite = await withTenant(account.id, async (tx) => {
+    publishedCustomDomainSite = await withTenant(customDomainAccount.id, async (tx) => {
       const [row] = await tx
         .insert(hostedWebsites)
         .values({
-          accountId: account.id,
+          accountId: customDomainAccount.id,
           subdomain: "public-routes-test-subdomain-2",
           customDomain: "public-routes-test.example.com",
           themeConfig: { primaryColor: "#222222", fontFamily: "Inter" },
@@ -55,39 +62,44 @@ describe.skipIf(!reachable)("GET /api/v1/public/websites/resolve", () => {
       return row!;
     });
 
-    await withTenant(account.id, (tx) =>
+    await withTenant(unpublishedAccount.id, (tx) =>
       tx.insert(hostedWebsites).values({
-        accountId: account.id,
+        accountId: unpublishedAccount.id,
         subdomain: "public-routes-test-subdomain-3",
         themeConfig: { primaryColor: "#333333", fontFamily: "Inter" },
         isPublished: false,
       }),
     );
 
-    await withTenant(account.id, (tx) =>
-      tx.insert(websitePages).values([
-        {
-          accountId: account.id,
-          websiteId: publishedSubdomainSite.id,
-          slug: "/",
-          layoutSchema: [{ type: "hero", title: "Welcome" }],
-          isPublished: true,
-        },
-        {
-          accountId: account.id,
-          websiteId: publishedCustomDomainSite.id,
-          slug: "/",
-          layoutSchema: [{ type: "hero", title: "Welcome 2" }],
-          isPublished: true,
-        },
-      ]),
+    await withTenant(subdomainAccount.id, (tx) =>
+      tx.insert(websitePages).values({
+        accountId: subdomainAccount.id,
+        websiteId: publishedSubdomainSite.id,
+        slug: "/",
+        layoutSchema: [{ type: "hero", title: "Welcome" }],
+        isPublished: true,
+      }),
+    );
+    await withTenant(customDomainAccount.id, (tx) =>
+      tx.insert(websitePages).values({
+        accountId: customDomainAccount.id,
+        websiteId: publishedCustomDomainSite.id,
+        slug: "/",
+        layoutSchema: [{ type: "hero", title: "Welcome 2" }],
+        isPublished: true,
+      }),
     );
   });
 
   afterAll(async () => {
-    await withTenant(account.id, (tx) => tx.delete(websitePages).where(eq(websitePages.accountId, account.id)));
-    await withTenant(account.id, (tx) => tx.delete(hostedWebsites).where(eq(hostedWebsites.accountId, account.id)));
-    await db.delete(accounts).where(eq(accounts.id, account.id));
+    await withTenant(subdomainAccount.id, (tx) => tx.delete(websitePages).where(eq(websitePages.accountId, subdomainAccount.id)));
+    await withTenant(customDomainAccount.id, (tx) => tx.delete(websitePages).where(eq(websitePages.accountId, customDomainAccount.id)));
+    await withTenant(subdomainAccount.id, (tx) => tx.delete(hostedWebsites).where(eq(hostedWebsites.accountId, subdomainAccount.id)));
+    await withTenant(customDomainAccount.id, (tx) => tx.delete(hostedWebsites).where(eq(hostedWebsites.accountId, customDomainAccount.id)));
+    await withTenant(unpublishedAccount.id, (tx) => tx.delete(hostedWebsites).where(eq(hostedWebsites.accountId, unpublishedAccount.id)));
+    await db.delete(accounts).where(eq(accounts.id, subdomainAccount.id));
+    await db.delete(accounts).where(eq(accounts.id, customDomainAccount.id));
+    await db.delete(accounts).where(eq(accounts.id, unpublishedAccount.id));
   });
 
   it("resolves a published site by subdomain", async () => {

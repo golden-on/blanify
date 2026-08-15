@@ -1,7 +1,11 @@
 import type { FastifyInstance } from "fastify";
 import { and, asc, eq, gte, lte } from "drizzle-orm";
-import { publicAvailabilityQuerySchema, resolveWebsiteQuerySchema } from "@repo/shared-types";
+import { idSchema, publicAvailabilityQuerySchema, resolveWebsiteQuerySchema } from "@repo/shared-types";
 import { nightlyAvailability, resolvePage, resolveWebsiteByDomain, withTenant } from "@repo/db";
+import { generateUnitICal } from "@repo/channel-sync";
+import { z } from "zod";
+
+const icsQuerySchema = z.object({ accountId: idSchema });
 
 const PUBLIC_CACHE_HEADER = "public, max-age=60";
 
@@ -63,5 +67,17 @@ export async function registerPublicRoutes(app: FastifyInstance) {
 
     reply.header("Cache-Control", PUBLIC_CACHE_HEADER);
     return reply.code(200).send({ nights: rows });
+  });
+
+  app.get("/api/v1/public/units/:unitId/calendar.ics", async (request, reply) => {
+    const params = request.params as { unitId: string };
+    const queryResult = icsQuerySchema.safeParse(request.query);
+    if (!queryResult.success) {
+      return reply.code(400).send({ error: { code: "INVALID_QUERY", message: "accountId query parameter is required" } });
+    }
+
+    const ics = await generateUnitICal(params.unitId, queryResult.data.accountId);
+    reply.header("Content-Type", "text/calendar; charset=utf-8");
+    return reply.code(200).send(ics);
   });
 }
