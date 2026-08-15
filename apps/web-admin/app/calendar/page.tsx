@@ -65,6 +65,7 @@ export default function CalendarPage() {
   const token = session?.token ?? null;
 
   const [units, setUnits] = useState<Unit[]>([]);
+  const [unitsLoaded, setUnitsLoaded] = useState(false);
   const [nightsByUnit, setNightsByUnit] = useState<Record<string, Record<string, Night>>>({});
   const [tasksByUnit, setTasksByUnit] = useState<Record<string, Record<string, Task[]>>>({});
   const [windowStart, setWindowStart] = useState(today());
@@ -85,6 +86,7 @@ export default function CalendarPage() {
     try {
       const unitsResponse = await apiFetch<{ units: Unit[] }>("/api/v1/host/units", token);
       setUnits(unitsResponse.units);
+      setUnitsLoaded(true);
 
       const entries = await Promise.all(
         unitsResponse.units.map(async (unit) => {
@@ -100,6 +102,7 @@ export default function CalendarPage() {
       setNightsByUnit(Object.fromEntries(entries));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load calendar");
+      setUnitsLoaded(true);
     }
   }, [token, windowStart, windowEnd]);
 
@@ -276,7 +279,13 @@ export default function CalendarPage() {
         </p>
       )}
 
-      {units.length === 0 ? (
+      {!unitsLoaded ? (
+        <div className="space-y-2" aria-busy="true" aria-label="Loading calendar">
+          {Array.from({ length: 4 }, (_, i) => (
+            <div key={i} className="h-12 w-full animate-pulse rounded-md bg-neutral-100" />
+          ))}
+        </div>
+      ) : units.length === 0 ? (
         token && <OnboardingWizard token={token} onComplete={() => void loadCalendar()} />
       ) : (
         <div className="overflow-x-auto">
