@@ -14,10 +14,10 @@ export default function Home() {
       router.replace("/login");
       return;
     }
-    // Cleaner/maintenance logins have no access to the calendar (host-only route,
-    // see apps/api-server/src/routes/host.ts) — land them on their task list instead.
-    const canSeeCalendar = session.role === "owner" || session.role === "manager";
-    router.replace(canSeeCalendar ? "/calendar" : "/tasks");
+    // Cleaner/maintenance logins have no access to the dashboard (host-only route,
+    // see apps/api-server/src/routes/dashboard.ts) — land them on their task list instead.
+    const canSeeDashboard = session.role === "owner" || session.role === "manager";
+    router.replace(canSeeDashboard ? "/dashboard" : "/tasks");
   }, [isLoading, session, router]);
 
   return null;

@@ -25,7 +25,7 @@ export default function LoginPage() {
       } else {
         await register(accountName, email, password);
       }
-      router.push("/calendar");
+      router.push("/dashboard");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong");
     } finally {

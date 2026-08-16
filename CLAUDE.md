@@ -325,6 +325,20 @@ COMMIT;
 
 ---
 
+### Phase 16: Executive Dashboard & Deep Reporting
+
+* **Executive Home Dashboard (`apps/web-admin/app/dashboard`):**
+  * Persistent host setup progress checklist (`hasUnits`, `hasStripeConnected`, `hasTaxRules`, `hasWebsitePublished`, `hasChannelsConnected`).
+  * "Today's Activity" panel showing arrivals, departures, and currently in-house guests via `GET /api/v1/host/dashboard`.
+  * Quick-access operational KPIs (monthly revenue, occupancy %, active bookings, pending messages).
+
+* **Expanded Reports & Analytics (`apps/web-admin/app/reports`):**
+  * Extended `GET /api/v1/host/analytics` with channel revenue distribution, average booking lead time, and unit performance comparison matrices.
+  * Interactive UI components for channel revenue splits and per-unit profitability comparisons.
+
+
+---
+
 
 ## Coding Conventions & Guidelines
 

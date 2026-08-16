@@ -1,6 +1,12 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { getAnalyticsSummary, getDailyAnalyticsSeries } from "@repo/db";
+import {
+  getAnalyticsSummary,
+  getAverageLeadTimeDays,
+  getChannelRevenueBreakdown,
+  getDailyAnalyticsSeries,
+  getUnitComparison,
+} from "@repo/db";
 import { requireAuth, requireRole } from "../auth";
 
 const analyticsQuerySchema = z.object({
@@ -23,11 +29,14 @@ export async function registerAnalyticsRoutes(app: FastifyInstance) {
     }
 
     const accountId = request.accountId!;
-    const [summary, daily] = await Promise.all([
+    const [summary, daily, channelRevenue, avgLeadTimeDays, unitComparison] = await Promise.all([
       getAnalyticsSummary(accountId, start, end),
       getDailyAnalyticsSeries(accountId, start, end),
+      getChannelRevenueBreakdown(accountId, start, end),
+      getAverageLeadTimeDays(accountId, start, end),
+      getUnitComparison(accountId, start, end),
     ]);
 
-    return reply.code(200).send({ summary, daily });
+    return reply.code(200).send({ summary, daily, channelRevenue, avgLeadTimeDays, unitComparison });
   });
 }

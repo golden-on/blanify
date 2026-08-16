@@ -98,6 +98,15 @@ async function getAccountName(accountId: string): Promise<string> {
   return account?.name ?? "My Property";
 }
 
+// Deliberately does not call getOrCreateSite — that auto-creates a hosted_websites row
+// on first call, which would be a surprising side effect for a read-only dashboard check.
+export async function isWebsitePublished(accountId: string): Promise<boolean> {
+  const [website] = await withTenant(accountId, (tx) =>
+    tx.select({ isPublished: hostedWebsites.isPublished }).from(hostedWebsites).where(eq(hostedWebsites.accountId, accountId)),
+  );
+  return website?.isPublished ?? false;
+}
+
 export async function getOrCreateSite(accountId: string): Promise<SiteConfig> {
   const existing = await withTenant(accountId, async (tx) => {
     const [website] = await tx.select().from(hostedWebsites).where(eq(hostedWebsites.accountId, accountId));

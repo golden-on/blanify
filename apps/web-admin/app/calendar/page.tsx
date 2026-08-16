@@ -131,6 +131,23 @@ export default function CalendarPage() {
     if (viewMode === "tasks") void loadTasks();
   }, [viewMode, loadTasks]);
 
+  // Dashboard "Quick Actions" deep-link into this page's existing drawers instead of
+  // duplicating booking/blocking UI there (see Phase 16 plan Decision 8). Reads the raw
+  // query string in an effect rather than useSearchParams() to avoid forcing this
+  // otherwise-static page into a Suspense boundary at build time.
+  useEffect(() => {
+    if (!unitsLoaded || units.length === 0) return;
+    const action = new URLSearchParams(window.location.search).get("action");
+    if (!action) return;
+
+    if (action === "new-booking") {
+      setShowNewBooking(true);
+    } else if (action === "block-dates") {
+      setClosedPeriodDraft({ unitId: units[0]!.id, start: today(), end: today() });
+    }
+    window.history.replaceState(null, "", "/calendar");
+  }, [unitsLoaded, units]);
+
   async function openReservationDetail(reservationId: string) {
     if (!token) return;
     try {

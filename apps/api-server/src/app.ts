@@ -19,6 +19,7 @@ import { registerDiscountRoutes } from "./routes/discounts";
 import { registerAddOnRoutes } from "./routes/add-ons";
 import { registerDepositClaimRoutes } from "./routes/deposit-claims";
 import { registerAnalyticsRoutes } from "./routes/analytics";
+import { registerDashboardRoutes } from "./routes/dashboard";
 import { registerSettingsRoutes } from "./routes/settings";
 import { registerSiteRoutes } from "./routes/site";
 import { registerChannelRoutes } from "./routes/channels";
@@ -69,6 +70,7 @@ export function buildApp(): FastifyInstance {
   app.register(registerAddOnRoutes);
   app.register(registerDepositClaimRoutes);
   app.register(registerAnalyticsRoutes);
+  app.register(registerDashboardRoutes);
   app.register(registerSettingsRoutes);
   app.register(registerSiteRoutes);
   app.register(registerChannelRoutes);

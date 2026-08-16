@@ -3,10 +3,11 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { BarChart3, CalendarDays, ClipboardList, Globe, Inbox, LogOut, Percent, PlusCircle, Receipt, Rss, Settings, Users } from "lucide-react";
+import { BarChart3, CalendarDays, ClipboardList, Globe, Inbox, LayoutDashboard, LogOut, Percent, PlusCircle, Receipt, Rss, Settings, Users } from "lucide-react";
 import { useSession, type UserRole } from "@/lib/session";
 
 const NAV_ITEMS: { href: string; label: string; icon: typeof CalendarDays; roles?: UserRole[] }[] = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["owner", "manager"] },
   { href: "/calendar", label: "Calendar", icon: CalendarDays, roles: ["owner", "manager"] },
   { href: "/reservations", label: "Reservations", icon: Receipt, roles: ["owner", "manager"] },
   { href: "/inbox", label: "Inbox", icon: Inbox, roles: ["owner", "manager"] },

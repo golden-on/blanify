@@ -41,6 +41,17 @@ export async function getChannelStatusForAccount(accountId: string): Promise<Cha
   });
 }
 
+// Lightweight existence check for the dashboard checklist — any connection or feed row
+// counts, regardless of status, unlike getChannelStatusForAccount's fuller per-card view.
+export async function hasAnyChannelConnection(accountId: string): Promise<boolean> {
+  return withTenant(accountId, async (tx) => {
+    const [connection] = await tx.select({ id: channelConnections.id }).from(channelConnections).limit(1);
+    if (connection) return true;
+    const [feed] = await tx.select({ id: unitIcalFeeds.id }).from(unitIcalFeeds).limit(1);
+    return !!feed;
+  });
+}
+
 export async function listIcalFeedsForAccount(accountId: string) {
   const rows = await withTenant(accountId, (tx) =>
     tx.select({ feed: unitIcalFeeds, unitName: units.name }).from(unitIcalFeeds).innerJoin(units, eq(units.id, unitIcalFeeds.unitId)),

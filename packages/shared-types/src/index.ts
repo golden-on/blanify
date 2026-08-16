@@ -20,3 +20,4 @@ export * from "./invoices";
 export * from "./units";
 export * from "./site";
 export * from "./channels";
+export * from "./dashboard";

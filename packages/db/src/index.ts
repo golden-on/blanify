@@ -23,3 +23,4 @@ export * from "./invoices";
 export * from "./deposit-claims";
 export * from "./analytics";
 export * from "./channels";
+export * from "./dashboard";

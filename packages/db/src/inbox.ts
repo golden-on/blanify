@@ -55,6 +55,16 @@ export async function listThreads(accountId: string, { page, pageSize, search, s
   });
 }
 
+export async function countOpenThreads(accountId: string): Promise<number> {
+  return withTenant(accountId, async (tx) => {
+    const [row] = await tx
+      .select({ count: sql<number>`count(*)::int`.mapWith(Number) })
+      .from(threads)
+      .where(eq(threads.status, "open"));
+    return row?.count ?? 0;
+  });
+}
+
 export async function updateThreadStatus(accountId: string, threadId: string, status: ThreadStatus) {
   return withTenant(accountId, async (tx) => {
     const [thread] = await tx
