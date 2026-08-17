@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, or, sql } from "drizzle-orm";
 import type { ThreadStatus } from "@repo/shared-types";
 import { withTenant } from "./tenant-context";
 import { threads } from "./schema/threads";
@@ -17,12 +17,20 @@ export interface ListThreadsFilters extends PageParams {
   status?: ThreadStatus;
 }
 
+// `status` is NOT NULL at the schema level, but rows written before that constraint
+// existed (or by any future bulk-insert path that skips the column default) can still
+// carry a literal NULL — treat those as 'open' everywhere a caller asks to filter or
+// count open threads, rather than silently dropping them from the inbox.
+function threadStatusCondition(status: ThreadStatus) {
+  return status === "open" ? or(eq(threads.status, "open"), isNull(threads.status)) : eq(threads.status, status);
+}
+
 export async function listThreads(accountId: string, { page, pageSize, search, status }: ListThreadsFilters) {
   return withTenant(accountId, async (tx) => {
     const offset = (page - 1) * pageSize;
 
     const conditions = [
-      status ? eq(threads.status, status) : undefined,
+      status ? threadStatusCondition(status) : undefined,
       search ? or(sql`${threads.guestName} ilike ${`%${search}%`}`, sql`${threads.guestEmail} ilike ${`%${search}%`}`) : undefined,
     ].filter((c): c is NonNullable<typeof c> => c !== undefined);
 
@@ -60,7 +68,7 @@ export async function countOpenThreads(accountId: string): Promise<number> {
     const [row] = await tx
       .select({ count: sql<number>`count(*)::int`.mapWith(Number) })
       .from(threads)
-      .where(eq(threads.status, "open"));
+      .where(threadStatusCondition("open"));
     return row?.count ?? 0;
   });
 }

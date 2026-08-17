@@ -196,7 +196,13 @@ export default function CalendarPage() {
   }
 
   function freeCountForDate(date: string): number {
-    return filteredUnits.filter((u) => nightsByUnit[u.id]?.[date]?.status === "available").length;
+    // A unit with no nightly_availability row yet for this date has never been booked
+    // or blocked, so it's implicitly available — only an explicit "booked"/"blocked"
+    // status should count against the free total.
+    return filteredUnits.filter((u) => {
+      const status = nightsByUnit[u.id]?.[date]?.status;
+      return status === undefined || status === "available";
+    }).length;
   }
 
   interface Segment {

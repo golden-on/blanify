@@ -1,4 +1,4 @@
-import { and, eq, gte, lte, ne } from "drizzle-orm";
+import { and, eq, gte, inArray, lte, ne } from "drizzle-orm";
 import { withTenant } from "./tenant-context";
 import { nightlyAvailability } from "./schema/nightly-availability";
 import { reservations } from "./schema/reservations";
@@ -24,16 +24,24 @@ export interface DailyAnalyticsPoint {
   occupancyRate: number;
 }
 
-function summarize(rows: { date: string; status: string; priceInCents: number | null }[]) {
-  const bookedNights = rows.filter((row) => row.status === "booked").length;
+// Reservation statuses that represent a live, revenue-bearing stay — used to gate
+// occupancy/revenue off of `reservations.status` rather than `nightly_availability.status`
+// alone, so a manual host booking's confirmed reservation always counts even if its
+// nightly rows haven't (or hadn't) been flipped to 'booked' in lockstep.
+const ACTIVE_RESERVATION_STATUSES = ["confirmed", "checked_in", "checked_out"] as const;
+
+function summarize(rows: { date: string; priceInCents: number | null; reservationStatus: string | null }[]) {
+  const isActive = (row: (typeof rows)[number]) =>
+    row.reservationStatus !== null && (ACTIVE_RESERVATION_STATUSES as readonly string[]).includes(row.reservationStatus);
+
+  const bookedRows = rows.filter(isActive);
+  const bookedNights = bookedRows.length;
   // "Available Nights" here means total inventory-days in the window
   // (available + booked + blocked), not just rows whose status literally
   // equals 'available' — this is the occupancy denominator, matching the
   // standard hospitality definition (Occupancy = booked / total capacity).
   const availableNights = rows.length;
-  const totalRoomRevenueInCents = rows
-    .filter((row) => row.status === "booked")
-    .reduce((sum, row) => sum + (row.priceInCents ?? 0), 0);
+  const totalRoomRevenueInCents = bookedRows.reduce((sum, row) => sum + (row.priceInCents ?? 0), 0);
 
   return { bookedNights, availableNights, totalRoomRevenueInCents };
 }
@@ -43,10 +51,11 @@ export async function getAnalyticsSummary(accountId: string, start: string, end:
     tx
       .select({
         date: nightlyAvailability.date,
-        status: nightlyAvailability.status,
         priceInCents: nightlyAvailability.priceInCents,
+        reservationStatus: reservations.status,
       })
       .from(nightlyAvailability)
+      .leftJoin(reservations, eq(reservations.id, nightlyAvailability.reservationId))
       .where(and(gte(nightlyAvailability.date, start), lte(nightlyAvailability.date, end))),
   );
 
@@ -69,10 +78,11 @@ export async function getDailyAnalyticsSeries(accountId: string, start: string, 
     tx
       .select({
         date: nightlyAvailability.date,
-        status: nightlyAvailability.status,
         priceInCents: nightlyAvailability.priceInCents,
+        reservationStatus: reservations.status,
       })
       .from(nightlyAvailability)
+      .leftJoin(reservations, eq(reservations.id, nightlyAvailability.reservationId))
       .where(and(gte(nightlyAvailability.date, start), lte(nightlyAvailability.date, end))),
   );
 
@@ -130,7 +140,13 @@ export async function getChannelRevenueBreakdown(accountId: string, start: strin
       .from(nightlyAvailability)
       .innerJoin(reservations, eq(reservations.id, nightlyAvailability.reservationId))
       .leftJoin(threads, eq(threads.reservationId, reservations.id))
-      .where(and(eq(nightlyAvailability.status, "booked"), gte(nightlyAvailability.date, start), lte(nightlyAvailability.date, end))),
+      .where(
+        and(
+          inArray(reservations.status, [...ACTIVE_RESERVATION_STATUSES]),
+          gte(nightlyAvailability.date, start),
+          lte(nightlyAvailability.date, end),
+        ),
+      ),
   );
 
   const totals = new Map<RevenueChannel, number>(CHANNEL_BUCKETS.map((c) => [c, 0]));
@@ -184,10 +200,11 @@ export async function getUnitComparison(accountId: string, start: string, end: s
       .select({
         unitId: nightlyAvailability.unitId,
         date: nightlyAvailability.date,
-        status: nightlyAvailability.status,
         priceInCents: nightlyAvailability.priceInCents,
+        reservationStatus: reservations.status,
       })
       .from(nightlyAvailability)
+      .leftJoin(reservations, eq(reservations.id, nightlyAvailability.reservationId))
       .where(and(gte(nightlyAvailability.date, start), lte(nightlyAvailability.date, end)));
     const reservationRowsInner = await tx
       .select({ unitId: reservations.unitId, checkIn: reservations.checkIn, createdAt: reservations.createdAt })
